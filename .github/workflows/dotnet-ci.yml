@@ -30,18 +30,50 @@ jobs:
       - name: Detect version
         id: version
         run: |
-          VERSION=$(nbgv get-version -v NuGetPackageVersion)
-          SEMVER=$(nbgv get-version -v SemVer2)
-          echo "nuget_version=$VERSION" >> $GITHUB_OUTPUT
+          TARGET="${{ github.base_ref }}"
+          FORK_RAW=$(jq -r '.fork // empty' version.json)
+          FORK_NUM=$(echo "$FORK_RAW" | tr -d '[:alpha:]')  # "R14" → "14"
+
+          if [[ "${{ github.event_name }}" == "pull_request" && \
+                ( "$TARGET" == "develop" || "$TARGET" == "qa" || "$TARGET" == "uat" ) ]]; then
+            IS_ENV_PR=true
+            SIMPLE=$(nbgv get-version -v SimpleVersion)
+            MAJOR=$(echo "$SIMPLE" | cut -d'.' -f1)
+            HEIGHT=$(echo "$SIMPLE" | cut -d'.' -f3)
+            PR="${{ github.event.pull_request.number }}"
+            if [[ -n "$FORK_NUM" ]]; then
+              BASE="${MAJOR}.${FORK_NUM}.${HEIGHT}"
+            else
+              BASE="$SIMPLE"
+            fi
+            NUGET_VERSION="${BASE}-pr${PR}"
+            SEMVER="$NUGET_VERSION"
+            ASM_INFO="$SEMVER"
+          else
+            IS_ENV_PR=false
+            NUGET_VERSION=$(nbgv get-version -v NuGetPackageVersion)
+            SEMVER=$(nbgv get-version -v SemVer2)
+            ASM_INFO=$(nbgv get-version -v AssemblyInformationalVersion)
+          fi
+          echo "nuget_version=$NUGET_VERSION" >> $GITHUB_OUTPUT
           echo "semver=$SEMVER" >> $GITHUB_OUTPUT
-          echo "Branch  : $GITHUB_REF_NAME"
+          echo "asm_info=$ASM_INFO" >> $GITHUB_OUTPUT
+          echo "is_env_pr=$IS_ENV_PR" >> $GITHUB_OUTPUT
+          echo "Branch  : ${TARGET:-$GITHUB_REF_NAME}"
           echo "Version : $SEMVER"
 
       - name: Restore
         run: dotnet restore
 
       - name: Build
-        run: dotnet build --configuration Release --no-restore
+        run: |
+          if [[ "${{ steps.version.outputs.is_env_pr }}" == "true" ]]; then
+            dotnet build --configuration Release --no-restore \
+              -p:PackageVersion="${{ steps.version.outputs.nuget_version }}" \
+              -p:AssemblyInformationalVersion="${{ steps.version.outputs.asm_info }}"
+          else
+            dotnet build --configuration Release --no-restore
+          fi
 
       - name: Test
         run: dotnet test --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage"
@@ -79,7 +111,7 @@ jobs:
           echo "### Build Summary" >> $GITHUB_STEP_SUMMARY
           echo "| Campo | Valor |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|" >> $GITHUB_STEP_SUMMARY
-          echo "| Branch | \`$GITHUB_REF_NAME\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Branch | \`${{ github.base_ref || github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| SemVer | \`${{ steps.version.outputs.semver }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| NuGet  | \`${{ steps.version.outputs.nuget_version }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Artifacts | API + Worker |" >> $GITHUB_STEP_SUMMARY

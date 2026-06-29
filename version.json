@@ -5,5 +5,6 @@
     "^refs/heads/main$",
     "^refs/heads/release/.*$",
     "^refs/heads/hotfix/.*$"
-  ]
+  ],
+  "fork": null
 }

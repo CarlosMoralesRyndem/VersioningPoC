@@ -33,7 +33,8 @@ nbgv get-version
 
 **Qué validar:**
 - `Version` → `1.0.{altura}`
-- `NuGetPackageVersion` → sin sufijo de pre-release
+- `NuGetPackageVersion` → sin sufijo de pre-release (ej. `1.0.15`)
+- `PublicRelease` → `True`
 - `CommitId` → hash del commit actual
 
 > La "altura" es el número de commits desde la versión base definida en `version.json`.
@@ -51,13 +52,13 @@ dotnet run --project src/Versioning.Api
 curl http://localhost:5000/version
 ```
 
-**Respuesta esperada:**
+**Respuesta esperada (en `main`, local):**
 ```json
 {
-  "version": "1.0.X-gABCDEF",
+  "version": "1.0.15+g1a2b3c4",
   "environment": "Development",
   "branch": "local",
-  "commit": "ABCDEF",
+  "commit": "1a2b3c4",
   "buildDate": "..."
 }
 ```
@@ -67,6 +68,8 @@ curl http://localhost:5000/version
 - [ ] Sigue el patrón `MAJOR.MINOR.PATCH`
 - [ ] El campo `commit` coincide con `git rev-parse --short HEAD`
 - [ ] `environment` es `Development` en local
+
+> En `main` la versión lleva `+g{hash}` como build metadata (public release). El campo `commit` se extrae del sufijo `+g`.
 
 ---
 
@@ -81,7 +84,7 @@ dotnet run --project src/Versioning.Worker
 **Salida esperada en consola:**
 ```
 info: VersionLoggerService[0]
-      Worker started | Version=1.0.X-gABCDEF | Branch=local | Commit=ABCDEF | Environment=Development
+      Worker started | Version=1.0.15+g1a2b3c4 | Branch=local | Commit=1a2b3c4 | Environment=Development
 ```
 
 **Qué validar:**
@@ -105,14 +108,14 @@ nbgv get-version
 **Qué validar:**
 - [ ] `PublicRelease` → `False`
 - [ ] `NuGetPackageVersion` → `1.0.{altura}-g{hash}` (sufijo con hash del commit)
-- [ ] `AssemblyInformationalVersion` → `1.0.{altura}+{hash}`
+- [ ] `AssemblyInformationalVersion` → contiene `-g{hash}`
 
 ```powershell
 # Confirmar que el ensamblado refleja la versión non-public
 dotnet build src/Versioning.Api --configuration Release
 dotnet run --project src/Versioning.Api
 curl http://localhost:5000/version
-# "version" debe contener "+{hash}" (build metadata del commit)
+# "version" debe contener "-g{hash}" (pre-release del commit)
 ```
 
 ---
@@ -130,8 +133,8 @@ nbgv get-version
 
 **Qué validar:**
 - [ ] `PublicRelease` → `True`
-- [ ] `NuGetPackageVersion` → `1.0.{altura}` (sin sufijo)
-- [ ] `AssemblyInformationalVersion` → `1.0.{altura}+{hash}` (metadata pero sin pre-release)
+- [ ] `NuGetPackageVersion` → `1.0.{altura}` (sin sufijo pre-release)
+- [ ] `AssemblyInformationalVersion` → `1.0.{altura}+g{hash}` (solo build metadata, sin pre-release)
 
 ---
 
@@ -170,7 +173,7 @@ dotnet test --configuration Release --verbosity normal
 
 ---
 
-## Ejercicio 8 — CI/CD en GitHub Actions
+## Ejercicio 8 — CI/CD en GitHub Actions (push a `main`)
 
 **Objetivo:** verificar que el pipeline publica ambos ejecutables con la versión en el nombre del artefacto.
 
@@ -184,10 +187,11 @@ Luego en GitHub → **Actions** → último run → revisar:
 **Qué validar:**
 - [ ] El step "Detect version" muestra la versión calculada por NBGV
 - [ ] Existen dos artefactos al final del pipeline:
-  - `versioning-api-{version}`
-  - `versioning-worker-{version}`
+  - `versioning-api-1.0.{altura}`
+  - `versioning-worker-1.0.{altura}`
 - [ ] Ambos artefactos tienen el **mismo número de versión**
 - [ ] El Summary muestra Branch, SemVer y NuGet correctamente
+- [ ] La versión **no** tiene sufijo pre-release (es public release)
 
 ---
 
@@ -199,9 +203,7 @@ Luego en GitHub → **Actions** → último run → revisar:
 dotnet publish src/Versioning.Api --configuration Release --output ./out/api
 dotnet publish src/Versioning.Worker --configuration Release --output ./out/worker
 
-# Inspeccionar la versión del ensamblado
-dotnet-ildasm ./out/api/Versioning.Api.dll 2>/dev/null | grep -i version
-# O con PowerShell:
+# PowerShell — inspeccionar la versión del ensamblado
 [System.Reflection.AssemblyName]::GetAssemblyName(".\out\api\Versioning.Api.dll").Version
 ```
 
@@ -211,15 +213,80 @@ dotnet-ildasm ./out/api/Versioning.Api.dll 2>/dev/null | grep -i version
 
 ---
 
-## Tabla de resumen — resultados esperados por rama
+## Ejercicio 10 — PR a rama de ambiente: versión con número de PR
 
-| Rama | NuGetPackageVersion | PublicRelease |
-|---|---|---|
-| `main` | `1.0.15` | ✅ |
-| `release/1.1` | `1.0.15` | ✅ |
-| `hotfix/bug` | `1.0.15` | ✅ |
-| `feature/algo` | `1.0.15-g1a2b3c4` | ❌ |
-| cualquier otra | `1.0.15-g1a2b3c4` | ❌ |
+**Objetivo:** verificar que un PR hacia `develop`, `qa` o `uat` genera versión `{version}-pr{N}` en el CI.
+
+**Preparación:**
+```powershell
+# Crear la rama develop si no existe
+git checkout -b develop
+git push origin develop
+
+# Crear una rama de feature
+git checkout -b feature/nueva-funcionalidad
+git commit --allow-empty -m "feat: nueva funcionalidad"
+git push origin feature/nueva-funcionalidad
+```
+
+Luego en GitHub → abrir PR desde `feature/nueva-funcionalidad` → hacia `develop`.
+
+**Qué validar en GitHub Actions:**
+- [ ] El step "Detect version" muestra `is_env_pr=true`
+- [ ] La versión calculada sigue el patrón `1.0.{altura}-pr{N}` (ej. `1.0.15-pr3`)
+- [ ] Los artefactos se llaman `versioning-api-1.0.15-pr3` y `versioning-worker-1.0.15-pr3`
+- [ ] El Summary muestra la versión con el número de PR
+
+**Contraejemplo** — PR hacia `main`:
+- [ ] El step detecta `is_env_pr=false`
+- [ ] La versión usa el esquema NBGV normal (`1.0.15-g{hash}`)
+- [ ] El número de PR **no** aparece en la versión
+
+---
+
+## Ejercicio 11 — Fork configurado: número de fork en el MINOR
+
+**Objetivo:** verificar que configurar `"fork": "R14"` en `version.json` inserta el número `14` como MINOR en PR builds.
+
+**Preparación:**
+```powershell
+# Editar version.json
+# Cambiar "fork": null  →  "fork": "R14"
+
+git add version.json
+git commit -m "chore: configurar fork R14"
+git push origin feature/nueva-funcionalidad
+```
+
+**Qué validar en GitHub Actions (PR → develop):**
+- [ ] El step extrae `FORK_NUM=14` de `"R14"`
+- [ ] La versión sigue el patrón `1.14.{altura}-pr{N}` (ej. `1.14.15-pr3`)
+- [ ] Artefactos: `versioning-api-1.14.15-pr3` y `versioning-worker-1.14.15-pr3`
+- [ ] El MAJOR (`1`) y el PATCH/height (`15`) no se alteran
+
+**Qué validar en push a `main` (con fork configurado):**
+- [ ] La versión sigue siendo `1.0.{altura}` sin cambios (el fork solo afecta PR builds a ambientes)
+
+**Rollback:**
+```powershell
+# Restaurar fork a null para el repositorio principal
+# "fork": "R14"  →  "fork": null
+```
+
+---
+
+## Tabla de resumen — resultados esperados
+
+| Trigger | Rama / Destino | fork en version.json | Versión | PublicRelease |
+|---|---|---|---|---|
+| push | `main` | cualquiera | `1.0.15` | ✅ |
+| push | `release/1.1` | cualquiera | `1.0.15` | ✅ |
+| push | `hotfix/bug` | cualquiera | `1.0.15` | ✅ |
+| push | `feature/algo` | cualquiera | `1.0.15-g1a2b3c4` | ❌ |
+| pull_request | → `develop` | `null` | `1.0.15-pr42` | — |
+| pull_request | → `qa` | `null` | `1.0.15-pr7` | — |
+| pull_request | → `uat` | `"R14"` | `1.14.15-pr3` | — |
+| pull_request | → `main` | cualquiera | `1.0.15-g1a2b3c4` | — |
 
 > NBGV distingue solo entre **public** y **non-public** release. Para labeling semántico por tipo de rama (`preview`, `rc`, incremento de MINOR), usar **GitVersion**.
 
@@ -227,12 +294,14 @@ dotnet-ildasm ./out/api/Versioning.Api.dll 2>/dev/null | grep -i version
 
 ## Checklist final
 
-- [ ] Ej. 1 — NBGV calcula versión correctamente en `main`
+- [ ] Ej. 1 — NBGV calcula versión correctamente en `main` (PublicRelease=True, sin sufijo)
 - [ ] Ej. 2 — API `/version` devuelve JSON con todos los campos
 - [ ] Ej. 3 — Worker loguea versión al arrancar
-- [ ] Ej. 4 — `feature/*` produce versión `preview` con MINOR incrementado
-- [ ] Ej. 5 — `release/*` produce versión `rc`
-- [ ] Ej. 6 — `hotfix/*` produce patch sin sufijo
+- [ ] Ej. 4 — `feature/*` produce versión non-public con `-g{hash}`
+- [ ] Ej. 5 — `release/*` produce versión limpia (public release)
+- [ ] Ej. 6 — `hotfix/*` produce versión limpia (public release)
 - [ ] Ej. 7 — 5/5 tests de integración pasan
 - [ ] Ej. 8 — CI genera artefactos `api` y `worker` con versión en el nombre
 - [ ] Ej. 9 — Versión está embebida en el DLL publicado
+- [ ] Ej. 10 — PR a `develop`/`qa`/`uat` genera versión con número de PR (`-pr{N}`)
+- [ ] Ej. 11 — Fork configurado inserta número en el MINOR (`1.14.{altura}-pr{N}`)

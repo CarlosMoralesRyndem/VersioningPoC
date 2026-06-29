@@ -10,6 +10,7 @@ Prueba de concepto (PoC) de una estrategia completa de versionado basada en **Se
 - [Estructura del proyecto](#estructura-del-proyecto)
 - [Cómo funciona el versionado](#cómo-funciona-el-versionado)
 - [Estrategia por rama](#estrategia-por-rama)
+- [Versionado por PR y Forks](#versionado-por-pr-y-forks)
 - [Archivos clave](#archivos-clave)
 - [Endpoint /version](#endpoint-version)
 - [Inicio rápido](#inicio-rápido)
@@ -40,7 +41,7 @@ Prueba de concepto (PoC) de una estrategia completa de versionado basada en **Se
 VersioningPoC/
 ├── VersioningPoC.sln
 │
-├── version.json                  # Configuración central de NBGV
+├── version.json                  # Configuración central de NBGV + fork ID
 ├── Directory.Build.props         # Propiedades MSBuild compartidas
 ├── Directory.Packages.props      # Gestión centralizada de paquetes NuGet
 ├── .gitignore
@@ -82,49 +83,83 @@ NBGV calcula la versión automáticamente combinando:
 ### Formato generado
 
 ```
-MAJOR.MINOR.PATCH[+metadata]         ← public release (main, release/*, hotfix/*)
-MAJOR.MINOR.PATCH-g{hash}            ← non-public release (feature/* y otras)
+MAJOR.MINOR.PATCH+g{hash}          ← public release  (main, release/*, hotfix/*)
+MAJOR.MINOR.PATCH-g{hash}          ← non-public      (feature/* y otras)
+MAJOR.MINOR.PATCH-pr{N}            ← PR a ambiente   (develop, qa, uat)
+MAJOR.FORK.PATCH-pr{N}             ← PR a ambiente   (con fork configurado)
 ```
 
 Ejemplos:
-- `main` → `1.0.15` (public release, sin sufijo)
-- `feature/login` → `1.0.15-g1a2b3c4` (non-public, con hash del commit)
-- `release/1.1` → `1.0.15` (public release)
-- `hotfix/error-pago` → `1.0.15` (public release)
+- `main` → `1.0.15` / `AssemblyInformationalVersion: 1.0.15+g1a2b3c4`
+- `feature/login` → `1.0.15-g1a2b3c4`
+- `release/1.1` → `1.0.15`
+- PR #42 → `develop` (sin fork) → `1.0.15-pr42`
+- PR #42 → `develop` (fork R14) → `1.14.15-pr42`
 
 ### Atributos de ensamblado generados automáticamente
 
-| Atributo | Ejemplo |
+| Escenario | `AssemblyInformationalVersion` |
 |---|---|
-| `AssemblyVersion` | `1.0.0.0` |
-| `AssemblyFileVersion` | `1.0.15.0` |
-| `AssemblyInformationalVersion` | `1.0.15-g1a2b3c4` |
+| Public release (`main`) | `1.0.15+g1a2b3c4` |
+| Non-public (`feature/*`) | `1.0.15-g1a2b3c4` |
+| PR a ambiente (sin fork) | `1.0.15-pr42` |
+| PR a ambiente (fork R14) | `1.14.15-pr42` |
 
 ---
 
 ## Estrategia por rama
 
-NBGV distingue dos tipos de rama: **public release** y **non-public release**, controlado por `publicReleaseRefSpec`.
+NBGV distingue dos tipos de rama: **public release** y **non-public release**, controlado por `publicReleaseRefSpec`. El CI extiende esto con versiones de PR para las ramas de ambiente.
 
-| Rama | Tipo | Ejemplo de versión |
-|---|---|---|
-| `main` | Public release | `1.0.15` |
-| `release/*` | Public release | `1.0.15` |
-| `hotfix/*` | Public release | `1.0.15` |
-| `feature/*` u otras | Non-public | `1.0.15-g1a2b3c4` |
+| Trigger | Rama / Destino | Tipo | Ejemplo de versión |
+|---|---|---|---|
+| push | `main` | Public release | `1.0.15` |
+| push | `release/*` | Public release | `1.0.15` |
+| push | `hotfix/*` | Public release | `1.0.15` |
+| push | `feature/*` u otras | Non-public | `1.0.15-g1a2b3c4` |
+| pull_request | → `develop` | Ambiente CI | `1.0.15-pr42` |
+| pull_request | → `qa` | Ambiente CI | `1.0.15-pr42` |
+| pull_request | → `uat` | Ambiente CI | `1.0.15-pr42` |
 
 - **Public release**: versión limpia sin sufijo, lista para producción.
 - **Non-public**: versión con `-g{hash}` del commit, identifica builds de desarrollo.
+- **PR a ambiente**: versión con `-pr{N}` donde N es el número de PR de GitHub; si hay fork configurado, el MINOR refleja el número de fork.
 
 > Para labels semánticos por rama (`preview`, `rc`, incremento de MINOR automático), la herramienta indicada es **GitVersion**, no NBGV. NBGV prioriza simplicidad: el patch crece con la altura de commits y el hash identifica el origen.
 
 ---
 
-## Archivos clave
+## Versionado por PR y Forks
 
-### `version.json`
+### PR como identificador de versión en ambientes
 
-Controla la versión base y qué ramas son public release:
+Cuando se abre un PR hacia `develop`, `qa` o `uat`, el CI calcula una versión que usa el número de PR en lugar del hash del commit:
+
+```
+Sin fork:   1.0.{height}-pr{PR_NUMBER}     →  1.0.15-pr42
+Con fork:   1.{fork}.{height}-pr{PR_NUMBER} →  1.14.15-pr42
+```
+
+Esto permite:
+- Trazar exactamente qué PR está desplegado en cada ambiente.
+- Nombrar los artefactos de forma legible: `versioning-api-1.14.15-pr42`.
+- Ordenar versiones cronológicamente (el height sigue siendo el contador de commits).
+
+### Forks de repositorio
+
+Algunos proyectos mantienen forks numerados del repositorio (ej. `R14`, `R7`) para clientes o líneas de producto independientes. El campo `fork` en `version.json` permite reflejar ese número en el MINOR de la versión sin modificar el workflow de CI.
+
+**Cómo funciona:**
+
+| `version.json` fork | Número extraído | Versión en PR #42 |
+|---|---|---|
+| `null` | — | `1.0.15-pr42` |
+| `"R14"` | `14` | `1.14.15-pr42` |
+| `"R7"` | `7` | `1.7.15-pr42` |
+
+El CI extrae el número con `tr -d '[:alpha:]'`, por lo que el formato del fork puede ser `R14`, `Fork14`, `v14`, etc.
+
+**Para configurar un fork**, editar `version.json`:
 
 ```json
 {
@@ -133,9 +168,37 @@ Controla la versión base y qué ramas son public release:
     "^refs/heads/main$",
     "^refs/heads/release/.*$",
     "^refs/heads/hotfix/.*$"
-  ]
+  ],
+  "fork": "R14"
 }
 ```
+
+---
+
+## Archivos clave
+
+### `version.json`
+
+Controla la versión base, las ramas public release y el identificador de fork:
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/dotnet/Nerdbank.GitVersioning/main/src/NerdBank.GitVersioning/version.schema.json",
+  "version": "1.0",
+  "publicReleaseRefSpec": [
+    "^refs/heads/main$",
+    "^refs/heads/release/.*$",
+    "^refs/heads/hotfix/.*$"
+  ],
+  "fork": null
+}
+```
+
+| Campo | Descripción |
+|---|---|
+| `version` | MAJOR.MINOR base; NBGV auto-incrementa el PATCH |
+| `publicReleaseRefSpec` | Expresiones regulares que identifican ramas de release público |
+| `fork` | Identificador de fork (ej. `"R14"`); `null` en el repositorio principal |
 
 ### `Directory.Build.props`
 
@@ -181,20 +244,22 @@ GET /version
 
 ```json
 {
-  "version": "1.0.15-g1a2b3c4",
-  "environment": "Development",
-  "branch": "main",
-  "commit": "1a2b3c4",
-  "buildDate": "2026-01-15T10:30:00Z"
+  "version": "1.0.15-pr42",
+  "environment": "Production",
+  "branch": "develop",
+  "commit": "unknown",
+  "buildDate": "2026-06-29T10:30:00Z"
 }
 ```
 
+> En builds de PR el campo `commit` devuelve `"unknown"` porque la versión `1.0.15-pr42` no incluye hash; el número de PR ya identifica el origen de forma trazable.
+
 | Campo | Origen |
 |---|---|
-| `version` | `ThisAssembly.AssemblyInformationalVersion` (NBGV) |
+| `version` | `ThisAssembly.AssemblyInformationalVersion` (NBGV o CI override) |
 | `environment` | `IHostEnvironment.EnvironmentName` |
 | `branch` | Variable de entorno `GITHUB_REF_NAME` / `GIT_BRANCH` |
-| `commit` | Extraído del sufijo `-g{hash}` de la versión informacional |
+| `commit` | Extraído del sufijo `+g{hash}` (public) o `-g{hash}` (non-public); `"unknown"` en PR builds |
 | `buildDate` | `DateTime.UtcNow` en el momento de la request |
 
 ---
@@ -210,13 +275,13 @@ GET /version
 
 ```powershell
 # Clonar con historial completo (necesario para NBGV)
-git clone --depth=0 https://github.com/CarlosMoralesRyndem/VersioningPoC.git
+git clone https://github.com/CarlosMoralesRyndem/VersioningPoC.git
 cd VersioningPoC
 
 # Restaurar dependencias
 dotnet restore
 
-# Ejecutar la API (F5 en Visual Studio hace lo mismo)
+# Ejecutar la API
 dotnet run --project src/Versioning.Api
 
 # Probar el endpoint
@@ -243,65 +308,59 @@ nbgv get-version
 
 ## Pipeline CI/CD
 
-El archivo `.github/workflows/dotnet-ci.yml` ejecuta automáticamente:
+El archivo `.github/workflows/dotnet-ci.yml` ejecuta automáticamente en cada push y pull request.
+
+### Pasos del pipeline
 
 | Paso | Descripción |
 |---|---|
 | Checkout | `fetch-depth: 0` para que NBGV acceda al historial completo |
 | Setup .NET 10 | Instala el SDK |
-| Detect version | Calcula y muestra la versión con NBGV CLI |
+| Install NBGV CLI | `dotnet tool install --global nbgv` |
+| Detect version | Calcula la versión según el trigger (ver lógica abajo) |
 | Restore | `dotnet restore` |
-| Build | `dotnet build --configuration Release` |
+| Build | `dotnet build --configuration Release` con override de versión si aplica |
 | Test | `dotnet test` con recolección de cobertura |
-| Publish | `dotnet publish` de la API |
-| Upload artifact | Sube el binario nombrado con la versión calculada |
-| Summary | Tabla de resumen en la UI de GitHub Actions |
+| Publish API | `dotnet publish` de la API |
+| Publish Worker | `dotnet publish` del Worker |
+| Upload artifacts | Artefactos nombrados `versioning-api-{version}` y `versioning-worker-{version}` |
+| Summary | Tabla Branch / SemVer / NuGet en la UI de GitHub Actions |
 
-### Ramas que disparan el CI
+### Lógica de versión en el CI
 
-- `main`
-- `feature/**`
-- `release/**`
-- `hotfix/**`
-- Pull Requests hacia cualquier rama
+```
+┌─ ¿Es pull_request a develop, qa o uat?
+│
+├── SÍ → Lee fork de version.json
+│         ├── fork = null  →  {SimpleVersion}-pr{N}         (ej. 1.0.15-pr42)
+│         └── fork = "R14" →  {Major}.{14}.{Height}-pr{N}  (ej. 1.14.15-pr42)
+│
+└── NO  → NBGV calcula la versión normalmente
+           ├── public release  →  1.0.15
+           └── non-public      →  1.0.15-g1a2b3c4
+```
+
+### Triggers
+
+| Trigger | Ramas |
+|---|---|
+| push | `main`, `feature/**`, `release/**`, `hotfix/**` |
+| pull_request | todas las ramas (lógica de versión PR aplica solo a `develop`, `qa`, `uat`) |
 
 ---
 
 ## Casos de prueba del versionado
 
-Los siguientes escenarios ilustran el comportamiento esperado:
-
-### Caso 1 — Rama `main`
-
-```
-Rama   : main
-Versión: 1.0.0
-Tipo   : Release público (sin sufijo)
-```
-
-### Caso 2 — Rama `feature/nuevo-login`
-
-```
-Rama   : feature/nuevo-login
-Versión: 1.1.0-preview.1
-Tipo   : Pre-release con incremento de MINOR
-```
-
-### Caso 3 — Rama `release/1.1`
-
-```
-Rama   : release/1.1
-Versión: 1.1.0-rc.1
-Tipo   : Release candidate
-```
-
-### Caso 4 — Rama `hotfix/error-login`
-
-```
-Rama   : hotfix/error-login
-Versión: 1.0.2
-Tipo   : Patch de corrección urgente
-```
+| Trigger | Rama / Destino PR | fork en version.json | Versión generada |
+|---|---|---|---|
+| push | `main` | cualquiera | `1.0.15` |
+| push | `release/1.1` | cualquiera | `1.0.15` |
+| push | `hotfix/bug` | cualquiera | `1.0.15` |
+| push | `feature/algo` | cualquiera | `1.0.15-g1a2b3c4` |
+| pull_request | → `develop` | `null` | `1.0.15-pr42` |
+| pull_request | → `qa` | `null` | `1.0.15-pr7` |
+| pull_request | → `uat` | `"R14"` | `1.14.15-pr3` |
+| pull_request | → `main` | cualquiera | `1.0.15-g1a2b3c4` (NBGV, sin cambio) |
 
 ---
 
@@ -315,21 +374,15 @@ Al iniciar, `VersionLoggerService` emite un log estructurado:
 
 ```
 info: VersionLoggerService[0]
-      Worker started | Version=1.0.15-g1a2b3c4 | Branch=main | Commit=1a2b3c4 | Environment=Production
+      Worker started | Version=1.14.15-pr42 | Branch=develop | Commit=unknown | Environment=Production
 ```
 
 | Campo | Origen |
 |---|---|
-| `Version` | `ThisAssembly.AssemblyInformationalVersion` (NBGV) |
+| `Version` | `ThisAssembly.AssemblyInformationalVersion` (NBGV o CI override) |
 | `Branch` | Variable de entorno `GITHUB_REF_NAME` / `GIT_BRANCH` |
-| `Commit` | Extraído del sufijo `-g{hash}` de la versión informacional |
+| `Commit` | Extraído del sufijo de versión; `"unknown"` en PR builds |
 | `Environment` | `IHostEnvironment.EnvironmentName` |
-
-### Ejecutar el Worker
-
-```powershell
-dotnet run --project src/Versioning.Worker
-```
 
 ### Diferencia clave con la API
 
@@ -347,15 +400,18 @@ dotnet run --project src/Versioning.Worker
 Para adoptar esta estrategia en un proyecto existente:
 
 1. **Copiar** `version.json`, `Directory.Build.props` y `Directory.Packages.props` a la raíz de la solución.
-2. **Agregar** la referencia a NBGV en cada `.csproj` (API, Worker, o librería):
+2. Ajustar el campo `"fork"` en `version.json`:
+   - `null` para el repositorio principal.
+   - `"R14"` (o el identificador que corresponda) para forks numerados.
+3. **Agregar** la referencia a NBGV en cada `.csproj`:
    ```xml
    <PackageReference Include="Nerdbank.GitVersioning" PrivateAssets="All" />
    ```
-3. Según el tipo de proyecto, exponer la versión:
+4. Según el tipo de proyecto, exponer la versión:
    - **API**: agregar el endpoint `GET /version`.
    - **Worker**: loguear `ThisAssembly.AssemblyInformationalVersion` en `StartAsync` o en el `BackgroundService`.
-4. **Copiar** el workflow de GitHub Actions y agregar un step de publish por cada ejecutable.
-5. Confirmar que el repositorio tiene **al menos un commit** antes de compilar (NBGV lo requiere para calcular la versión).
+5. **Copiar** el workflow de GitHub Actions y agregar un step de publish por cada ejecutable.
+6. Confirmar que el repositorio tiene **al menos un commit** antes de compilar (NBGV lo requiere para calcular la versión).
 
 ---
 

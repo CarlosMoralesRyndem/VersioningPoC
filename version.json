@@ -5,21 +5,18 @@
     "^refs/heads/main$",
     "^refs/heads/release/.*$"
   ],
-  "branchesVersioningScheme": [
-    {
-      "pattern": "^refs/heads/feature/",
+  "branches": {
+    "^refs/heads/feature/": {
       "versionIncrement": "minor",
       "tag": "preview"
     },
-    {
-      "pattern": "^refs/heads/release/",
+    "^refs/heads/release/": {
       "versionIncrement": "none",
       "tag": "rc"
     },
-    {
-      "pattern": "^refs/heads/hotfix/",
+    "^refs/heads/hotfix/": {
       "versionIncrement": "patch",
       "tag": ""
     }
-  ]
+  }
 }

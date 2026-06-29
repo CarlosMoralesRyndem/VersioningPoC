@@ -91,9 +91,9 @@ info: VersionLoggerService[0]
 
 ---
 
-## Ejercicio 4 — Rama `feature/*`: versión con sufijo `preview`
+## Ejercicio 4 — Rama `feature/*`: non-public release con hash
 
-**Objetivo:** verificar que las ramas feature incrementan MINOR y agregan el tag `preview`.
+**Objetivo:** verificar que ramas fuera de `publicReleaseRefSpec` generan versión con sufijo `-g{hash}`.
 
 ```powershell
 git checkout -b feature/mi-nueva-funcionalidad
@@ -103,21 +103,23 @@ nbgv get-version
 ```
 
 **Qué validar:**
-- [ ] `Version` → `1.1.0-preview.{altura}`
-- [ ] MINOR pasó de `0` a `1` respecto a `main`
-- [ ] PATCH es `0`
+- [ ] `PublicRelease` → `False`
+- [ ] `NuGetPackageVersion` → `1.0.{altura}-g{hash}` (sufijo con hash del commit)
+- [ ] `AssemblyInformationalVersion` → `1.0.{altura}+{hash}`
 
 ```powershell
-# Compila y verifica que el ensamblado tiene la versión correcta
+# Confirmar que el ensamblado refleja la versión non-public
 dotnet build src/Versioning.Api --configuration Release
 dotnet run --project src/Versioning.Api
 curl http://localhost:5000/version
-# "version" debe contener "preview"
+# "version" debe contener "+{hash}" (build metadata del commit)
 ```
 
 ---
 
-## Ejercicio 5 — Rama `release/*`: versión con sufijo `rc`
+## Ejercicio 5 — Rama `release/*`: public release sin sufijo
+
+**Objetivo:** verificar que `release/*` está en `publicReleaseRefSpec` y genera versión limpia.
 
 ```powershell
 git checkout main
@@ -127,12 +129,15 @@ nbgv get-version
 ```
 
 **Qué validar:**
-- [ ] `Version` → `1.0.{altura}-rc.{n}` (no hay incremento de versión, solo el tag)
-- [ ] `NuGetPackageVersion` contiene `-rc`
+- [ ] `PublicRelease` → `True`
+- [ ] `NuGetPackageVersion` → `1.0.{altura}` (sin sufijo)
+- [ ] `AssemblyInformationalVersion` → `1.0.{altura}+{hash}` (metadata pero sin pre-release)
 
 ---
 
-## Ejercicio 6 — Rama `hotfix/*`: patch sin sufijo
+## Ejercicio 6 — Rama `hotfix/*`: public release sin sufijo
+
+**Objetivo:** verificar que `hotfix/*` también es public release (igual que `main`).
 
 ```powershell
 git checkout main
@@ -143,9 +148,9 @@ nbgv get-version
 ```
 
 **Qué validar:**
-- [ ] `Version` → `1.0.{altura}` (sin sufijo pre-release)
+- [ ] `PublicRelease` → `True`
+- [ ] `NuGetPackageVersion` → `1.0.{altura}` (sin sufijo, versión lista para producción)
 - [ ] MAJOR y MINOR no cambian respecto a `main`
-- [ ] Se genera como un release público (`PublicRelease: true`)
 
 ---
 
@@ -208,13 +213,15 @@ dotnet-ildasm ./out/api/Versioning.Api.dll 2>/dev/null | grep -i version
 
 ## Tabla de resumen — resultados esperados por rama
 
-| Rama | Ejemplo de versión | PublicRelease |
+| Rama | NuGetPackageVersion | PublicRelease |
 |---|---|---|
 | `main` | `1.0.15` | ✅ |
-| `feature/algo` | `1.1.0-preview.3` | ❌ |
-| `release/1.1` | `1.1.0-rc.2` | ✅ |
-| `hotfix/bug` | `1.0.16` | ✅ |
-| `otra-rama` | `1.0.15-{branch}.3` | ❌ |
+| `release/1.1` | `1.0.15` | ✅ |
+| `hotfix/bug` | `1.0.15` | ✅ |
+| `feature/algo` | `1.0.15-g1a2b3c4` | ❌ |
+| cualquier otra | `1.0.15-g1a2b3c4` | ❌ |
+
+> NBGV distingue solo entre **public** y **non-public** release. Para labeling semántico por tipo de rama (`preview`, `rc`, incremento de MINOR), usar **GitVersion**.
 
 ---
 

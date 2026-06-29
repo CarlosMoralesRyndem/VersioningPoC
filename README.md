@@ -82,14 +82,15 @@ NBGV calcula la versión automáticamente combinando:
 ### Formato generado
 
 ```
-MAJOR.MINOR.PATCH[-prerelease][+metadata]
+MAJOR.MINOR.PATCH[+metadata]         ← public release (main, release/*, hotfix/*)
+MAJOR.MINOR.PATCH-g{hash}            ← non-public release (feature/* y otras)
 ```
 
 Ejemplos:
-- `main` → `1.0.15` (release público, sin sufijo)
-- `feature/login` → `1.1.3-preview.0+g1a2b3c4`
-- `release/1.1` → `1.1.0-rc.5`
-- `hotfix/error-pago` → `1.0.2`
+- `main` → `1.0.15` (public release, sin sufijo)
+- `feature/login` → `1.0.15-g1a2b3c4` (non-public, con hash del commit)
+- `release/1.1` → `1.0.15` (public release)
+- `hotfix/error-pago` → `1.0.15` (public release)
 
 ### Atributos de ensamblado generados automáticamente
 
@@ -103,14 +104,19 @@ Ejemplos:
 
 ## Estrategia por rama
 
-| Rama | Incremento | Sufijo pre-release | Ejemplo |
-|---|---|---|---|
-| `main` | — | ninguno (release público) | `1.0.15` |
-| `feature/*` | `minor` | `preview` | `1.1.0-preview.3` |
-| `release/*` | — | `rc` | `1.1.0-rc.1` |
-| `hotfix/*` | `patch` | ninguno | `1.0.2` |
+NBGV distingue dos tipos de rama: **public release** y **non-public release**, controlado por `publicReleaseRefSpec`.
 
-Esta estrategia se configura en `version.json` mediante `branchesVersioningScheme`.
+| Rama | Tipo | Ejemplo de versión |
+|---|---|---|
+| `main` | Public release | `1.0.15` |
+| `release/*` | Public release | `1.0.15` |
+| `hotfix/*` | Public release | `1.0.15` |
+| `feature/*` u otras | Non-public | `1.0.15-g1a2b3c4` |
+
+- **Public release**: versión limpia sin sufijo, lista para producción.
+- **Non-public**: versión con `-g{hash}` del commit, identifica builds de desarrollo.
+
+> Para labels semánticos por rama (`preview`, `rc`, incremento de MINOR automático), la herramienta indicada es **GitVersion**, no NBGV. NBGV prioriza simplicidad: el patch crece con la altura de commits y el hash identifica el origen.
 
 ---
 
@@ -118,19 +124,15 @@ Esta estrategia se configura en `version.json` mediante `branchesVersioningSchem
 
 ### `version.json`
 
-Controla la versión base y las reglas por rama:
+Controla la versión base y qué ramas son public release:
 
 ```json
 {
   "version": "1.0",
   "publicReleaseRefSpec": [
     "^refs/heads/main$",
-    "^refs/heads/release/.*$"
-  ],
-  "branchesVersioningScheme": [
-    { "pattern": "^refs/heads/feature/", "versionIncrement": "minor", "tag": "preview" },
-    { "pattern": "^refs/heads/release/", "versionIncrement": "none",  "tag": "rc" },
-    { "pattern": "^refs/heads/hotfix/",  "versionIncrement": "patch", "tag": "" }
+    "^refs/heads/release/.*$",
+    "^refs/heads/hotfix/.*$"
   ]
 }
 ```

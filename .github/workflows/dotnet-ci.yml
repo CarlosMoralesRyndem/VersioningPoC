@@ -63,20 +63,20 @@ jobs:
           echo "Version : $SEMVER"
 
       - name: Restore
-        run: dotnet restore
+        run: dotnet restore VersioningPoC.sln
 
       - name: Build
         run: |
           if [[ "${{ steps.version.outputs.is_env_pr }}" == "true" ]]; then
-            dotnet build --configuration Release --no-restore \
+            dotnet build VersioningPoC.sln --configuration Release --no-restore \
               -p:PackageVersion="${{ steps.version.outputs.nuget_version }}" \
               -p:AssemblyInformationalVersion="${{ steps.version.outputs.asm_info }}"
           else
-            dotnet build --configuration Release --no-restore
+            dotnet build VersioningPoC.sln --configuration Release --no-restore
           fi
 
       - name: Test
-        run: dotnet test --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage"
+        run: dotnet test VersioningPoC.sln --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage"
 
       - name: Publish API
         run: >

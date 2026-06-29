@@ -8,11 +8,18 @@ app.MapGet("/version", (IHostEnvironment env) =>
 {
     var informationalVersion = ThisAssembly.AssemblyInformationalVersion;
 
-    // NBGV embeds commit as "-g{hash}" suffix: "1.0.15-g123abc"
+    // Public release:     "1.0.3+abc1234"   → hash after '+'
+    // Non-public release: "1.0.6-gabc1234"  → hash after '-g'
     var commit = "unknown";
     var dashGIndex = informationalVersion.IndexOf("-g", StringComparison.Ordinal);
     if (dashGIndex > 0)
         commit = informationalVersion[(dashGIndex + 2)..];
+    else
+    {
+        var plusIndex = informationalVersion.IndexOf('+', StringComparison.Ordinal);
+        if (plusIndex > 0)
+            commit = informationalVersion[(plusIndex + 1)..];
+    }
 
     // Branch injected by CI (GITHUB_REF_NAME) or local git tooling
     var branch = Environment.GetEnvironmentVariable("GITHUB_REF_NAME")

@@ -3,6 +3,7 @@
     "Versioning.Api": {
       "commandName": "Project",
       "launchBrowser": true,
+      "launchUrl": "version",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },

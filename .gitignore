@@ -21,3 +21,4 @@ nuget.config
 ## OS
 .DS_Store
 Thumbs.db
+*.binlog

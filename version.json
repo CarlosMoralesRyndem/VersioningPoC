@@ -3,23 +3,7 @@
   "version": "1.0",
   "publicReleaseRefSpec": [
     "^refs/heads/main$",
-    "^refs/heads/release/.*$"
-  ],
-  "branchesVersioningScheme": [
-    {
-      "pattern": "^refs/heads/feature/",
-      "versionIncrement": "minor",
-      "tag": "preview"
-    },
-    {
-      "pattern": "^refs/heads/release/",
-      "versionIncrement": "none",
-      "tag": "rc"
-    },
-    {
-      "pattern": "^refs/heads/hotfix/",
-      "versionIncrement": "patch",
-      "tag": ""
-    }
+    "^refs/heads/release/.*$",
+    "^refs/heads/hotfix/.*$"
   ]
 }

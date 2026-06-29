@@ -83,27 +83,30 @@ NBGV calcula la versión automáticamente combinando:
 ### Formato generado
 
 ```
-MAJOR.MINOR.PATCH+g{hash}          ← public release  (main, release/*, hotfix/*)
-MAJOR.MINOR.PATCH-g{hash}          ← non-public      (feature/* y otras)
+MAJOR.MINOR.PATCH+{hash}           ← public release  (main, release/*, hotfix/*)
+MAJOR.MINOR.PATCH+{hash}           ← non-public      (feature/* y otras) — AssemblyInformationalVersion
+MAJOR.MINOR.PATCH-g{hash}          ← non-public      (feature/* y otras) — NuGetPackageVersion
 MAJOR.MINOR.PATCH-pr{N}            ← PR a ambiente   (develop, qa, uat)
 MAJOR.FORK.PATCH-pr{N}             ← PR a ambiente   (con fork configurado)
 ```
 
 Ejemplos:
-- `main` → `1.0.15` / `AssemblyInformationalVersion: 1.0.15+g1a2b3c4`
-- `feature/login` → `1.0.15-g1a2b3c4`
-- `release/1.1` → `1.0.15`
-- PR #42 → `develop` (sin fork) → `1.0.15-pr42`
-- PR #42 → `develop` (fork R14) → `1.14.15-pr42`
+- `main` → `NuGetPackageVersion: 1.0.10` / `AssemblyInformationalVersion: 1.0.10+5d54999cf4`
+- `feature/login` → `NuGetPackageVersion: 1.0.11-gd0e49296a5` / `AssemblyInformationalVersion: 1.0.11+d0e49296a5`
+- `release/1.1` → `NuGetPackageVersion: 1.0.10`
+- PR #42 → `develop` (sin fork) → `1.0.10-pr42`
+- PR #42 → `develop` (fork R14) → `1.14.10-pr42`
+
+> `AssemblyInformationalVersion` usa siempre `+{hash}` como separador (tanto public como non-public). El sufijo `-g{hash}` aparece únicamente en `NuGetPackageVersion` para ramas non-public.
 
 ### Atributos de ensamblado generados automáticamente
 
-| Escenario | `AssemblyInformationalVersion` |
-|---|---|
-| Public release (`main`) | `1.0.15+g1a2b3c4` |
-| Non-public (`feature/*`) | `1.0.15-g1a2b3c4` |
-| PR a ambiente (sin fork) | `1.0.15-pr42` |
-| PR a ambiente (fork R14) | `1.14.15-pr42` |
+| Escenario | `NuGetPackageVersion` | `AssemblyInformationalVersion` |
+|---|---|---|
+| Public release (`main`) | `1.0.10` | `1.0.10+5d54999cf4` |
+| Non-public (`feature/*`) | `1.0.11-gd0e49296a5` | `1.0.11+d0e49296a5` |
+| PR a ambiente (sin fork) | `1.0.10-pr42` | `1.0.10-pr42` |
+| PR a ambiente (fork R14) | `1.14.10-pr42` | `1.14.10-pr42` |
 
 ---
 
@@ -259,7 +262,7 @@ GET /version
 | `version` | `ThisAssembly.AssemblyInformationalVersion` (NBGV o CI override) |
 | `environment` | `IHostEnvironment.EnvironmentName` |
 | `branch` | Variable de entorno `GITHUB_REF_NAME` / `GIT_BRANCH` |
-| `commit` | Extraído del sufijo `+g{hash}` (public) o `-g{hash}` (non-public); `"unknown"` en PR builds |
+| `commit` | Extraído tras el separador `+` (o `-g` en formato legacy); `"unknown"` en PR builds |
 | `buildDate` | `DateTime.UtcNow` en el momento de la request |
 
 ---

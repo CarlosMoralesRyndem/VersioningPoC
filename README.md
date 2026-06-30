@@ -17,6 +17,7 @@ Prueba de concepto (PoC) de una estrategia completa de versionado basada en **Se
 - [Pipeline CI/CD](#pipeline-cicd)
 - [Casos de prueba del versionado](#casos-de-prueba-del-versionado)
 - [Validación en servidor](#validación-en-servidor)
+- [Worker Service](#worker-service)
 - [Reutilización en otras soluciones](#reutilización-en-otras-soluciones)
 
 ---
@@ -58,7 +59,8 @@ VersioningPoC/
 │   │   ├── VersionLoggerService.cs
 │   │   └── Versioning.Worker.csproj
 │   │
-│   └── Versioning.Core/          # Librería de dominio (reutilizable)
+│   └── Versioning.Core/          # Librería compartida: BuildInfo (Version, Branch, Commit)
+│       ├── BuildInfo.cs
 │       └── Versioning.Core.csproj
 │
 ├── tests/
@@ -209,6 +211,18 @@ Controla la versión base, las ramas public release y el identificador de fork:
 | `version` | MAJOR.MINOR base; NBGV auto-incrementa el PATCH |
 | `publicReleaseRefSpec` | Expresiones regulares que identifican ramas de release público |
 | `fork` | Identificador de fork (ej. `"R14"`); `null` en el repositorio principal |
+
+### `src/Versioning.Core/BuildInfo.cs`
+
+Librería compartida que resuelve en runtime los tres valores de trazabilidad. Tanto la API como el Worker la consumen:
+
+| Propiedad | Lógica de resolución |
+|---|---|
+| `Version` | Lee `ci-branch.txt` si existe; si no, usa `AssemblyInformationalVersionAttribute` vía reflection |
+| `Branch` | Lee `ci-branch.txt` → `GITHUB_REF_NAME` → `GIT_BRANCH` → `git rev-parse --abbrev-ref HEAD` → `"unknown"` |
+| `Commit` | Extrae el hash tras `+` o `-g` de la versión; `"unknown"` si no hay separador |
+
+El archivo `ci-branch.txt` es escrito por el CI en el output de publish (`publish/api/` y `publish/worker/`), por lo que el artifact deployado siempre conoce su rama de origen.
 
 ### `Directory.Build.props`
 

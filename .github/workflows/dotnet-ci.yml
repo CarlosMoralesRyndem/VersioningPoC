@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+      - dev
+      - qa
+      - uat
       - 'feature/**'
       - 'hotfix/**'
       - 'warranty/**'
@@ -94,6 +97,12 @@ jobs:
         if: steps.version.outputs.is_env_pr == 'true'
         run: echo "${{ steps.version.outputs.nuget_version }}" > publish/api/ci-version.txt
 
+      - name: Write CI branch file
+        run: |
+          BRANCH="${{ github.head_ref || github.ref_name }}"
+          echo "$BRANCH" > publish/api/ci-branch.txt
+          echo "$BRANCH" > publish/worker/ci-branch.txt
+
       - name: Upload API artifact
         uses: actions/upload-artifact@v4
         with:
@@ -121,7 +130,7 @@ jobs:
   deploy:
     needs: build
     runs-on: windows-latest
-    if: github.event_name == 'pull_request' && (github.base_ref == 'dev' || github.base_ref == 'qa' || github.base_ref == 'uat')
+    if: github.event_name == 'push' && (github.ref_name == 'dev' || github.ref_name == 'qa' || github.ref_name == 'uat')
 
     steps:
       - name: Download API artifact
@@ -148,6 +157,5 @@ jobs:
           Add-Content $env:GITHUB_STEP_SUMMARY "### Deploy Summary`n"
           Add-Content $env:GITHUB_STEP_SUMMARY "| Campo | Valor |`n|---|---|"
           Add-Content $env:GITHUB_STEP_SUMMARY "| Versión desplegada | ``${{ needs.build.outputs.nuget_version }}`` |"
-          Add-Content $env:GITHUB_STEP_SUMMARY "| Ambiente | ``${{ github.base_ref }}`` |"
+          Add-Content $env:GITHUB_STEP_SUMMARY "| Ambiente | ``${{ github.ref_name }}`` |"
           Add-Content $env:GITHUB_STEP_SUMMARY "| URL | http://poctest.runasp.net/version |"
-          Add-Content $env:GITHUB_STEP_SUMMARY "| PR | #${{ github.event.pull_request.number }} |"

@@ -21,6 +21,14 @@ public static class BuildInfo
 
     private static string ResolveBranch()
     {
+        var ciFile = Path.Combine(AppContext.BaseDirectory, "ci-branch.txt");
+        if (File.Exists(ciFile))
+        {
+            var content = File.ReadAllText(ciFile).Trim();
+            if (!string.IsNullOrEmpty(content))
+                return content;
+        }
+
         var branch = Environment.GetEnvironmentVariable("GITHUB_REF_NAME")
                   ?? Environment.GetEnvironmentVariable("GIT_BRANCH");
 

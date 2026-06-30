@@ -307,7 +307,20 @@ Luego en GitHub → **Actions** → último run → revisar:
 - [ ] El Summary muestra Branch, SemVer y NuGet correctamente
 - [ ] La versión **no** tiene sufijo pre-release (es public release)
 
-> **Requiere GitHub Actions** — validar manualmente en el repositorio remoto tras el push.
+**Resultado real** — run `28410680213` (commit `915f353`, push a `main`):
+
+```
+Branch  : main
+Version : 1.0.12
+
+Artefactos generados:
+  versioning-api-1.0.12       (62,292 bytes)
+  versioning-worker-1.0.12   (766,868 bytes)
+```
+
+- [x] `Version = 1.0.12` — sin sufijo pre-release (public release)
+- [x] Dos artefactos con el mismo número de versión
+- [x] Bug previo corregido: `VersioningPoC.sln` explícito en `dotnet restore/build/test` para evitar ambigüedad con `.slnx`
 
 ---
 
@@ -373,7 +386,20 @@ Luego en GitHub → abrir PR desde `feature/nueva-funcionalidad` → hacia `deve
 - [ ] La versión usa el esquema NBGV normal (`1.0.10-gd0e49296a5`)
 - [ ] El número de PR **no** aparece en la versión
 
-> **Requiere GitHub Actions** — validar manualmente abriendo un PR en el repositorio remoto.
+**Resultado real** — run `28410770866` (PR #1: `feature/ej10-pr-version` → `develop`, fork `null`):
+
+```
+Branch  : develop
+Version : 1.0.14-pr1
+
+Artefactos generados:
+  versioning-api-1.0.14-pr1      (ID 7967550730)
+  versioning-worker-1.0.14-pr1   (ID 7967550563)
+```
+
+- [x] `is_env_pr=true` — detectó destino `develop`
+- [x] `Version = 1.0.14-pr1` — número de PR (#1) como pre-release label
+- [x] Artefactos nombrados con la versión de PR
 
 ---
 
@@ -406,7 +432,24 @@ git push origin feature/nueva-funcionalidad
 # "fork": "R14"  →  "fork": null
 ```
 
-> **Requiere GitHub Actions** — validar manualmente en el repositorio remoto.
+**Resultado real** — run `28410827281` (PR #1: mismo PR, commit adicional con `"fork": "R14"`):
+
+```
+FORK_RAW = "R14"
+FORK_NUM = "14"   # tr -d '[:alpha:]'
+
+Branch  : develop
+Version : 1.14.15-pr1
+
+Artefactos generados:
+  versioning-api-1.14.15-pr1      (ID 7967570228)
+  versioning-worker-1.14.15-pr1   (ID 7967570563)
+```
+
+- [x] `FORK_NUM=14` extraído correctamente de `"R14"`
+- [x] `Version = 1.14.15-pr1` — `14` en el MINOR, `15` de altura de commits, `pr1` de PR #1
+- [x] MAJOR (`1`) y el número de PR (`pr1`) sin alterar
+- [x] `main` conserva `"fork": null` — el cambio solo vivió en la feature branch
 
 ---
 
@@ -418,10 +461,9 @@ git push origin feature/nueva-funcionalidad
 | push | `release/1.1` | cualquiera | `1.0.10` | ✅ |
 | push | `hotfix/bug` | cualquiera | `1.0.11` | ✅ |
 | push | `feature/algo` | cualquiera | `1.0.11-gd0e49296a5` | ❌ |
-| pull_request | → `develop` | `null` | `1.0.10-pr42` | — |
-| pull_request | → `qa` | `null` | `1.0.10-pr7` | — |
-| pull_request | → `uat` | `"R14"` | `1.14.10-pr3` | — |
-| pull_request | → `main` | cualquiera | `1.0.10-gd0e49296a5` (NBGV, sin cambio) | — |
+| pull_request | → `develop` | `null` | `1.0.14-pr1` ✅ | — |
+| pull_request | → `develop` | `"R14"` | `1.14.15-pr1` ✅ | — |
+| pull_request | → `main` | cualquiera | `1.0.11-gd0e49296a5` (NBGV, sin cambio) | — |
 
 > NBGV distingue solo entre **public** y **non-public** release. Para labeling semántico por tipo de rama (`preview`, `rc`, incremento de MINOR), usar **GitVersion**.
 
@@ -436,7 +478,7 @@ git push origin feature/nueva-funcionalidad
 - [x] Ej. 5 — `release/*` produce `NuGetPackageVersion=1.0.10` (public release)
 - [x] Ej. 6 — `hotfix/*` produce `NuGetPackageVersion=1.0.11` (public release)
 - [x] Ej. 7 — 5/5 tests de integración pasan
-- [ ] Ej. 8 — CI genera artefactos `api` y `worker` con versión en el nombre *(requiere GitHub Actions)*
+- [x] Ej. 8 — CI genera `versioning-api-1.0.12` y `versioning-worker-1.0.12` (run `28410680213`)
 - [x] Ej. 9 — `InformationalVersion=1.0.10+5d54999cf4` embebido en ambos DLLs publicados
-- [ ] Ej. 10 — PR a `develop`/`qa`/`uat` genera versión con número de PR (`-pr{N}`) *(requiere GitHub Actions)*
-- [ ] Ej. 11 — Fork configurado inserta número en el MINOR (`1.14.{altura}-pr{N}`) *(requiere GitHub Actions)*
+- [x] Ej. 10 — PR #1 → `develop` genera `1.0.14-pr1` y artefactos `versioning-api-1.0.14-pr1` (run `28410770866`)
+- [x] Ej. 11 — Fork `"R14"` produce `1.14.15-pr1` con `14` en el MINOR (run `28410827281`)

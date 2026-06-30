@@ -7,7 +7,7 @@ app.MapGet("/", () => "Versioning PoC API is running");
 app.MapGet("/version", (IHostEnvironment env) =>
     Results.Ok(new
     {
-        version = ThisAssembly.AssemblyInformationalVersion,
+        version = BuildInfo.Version,
         environment = env.EnvironmentName,
         branch = BuildInfo.Branch,
         commit = BuildInfo.Commit,

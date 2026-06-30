@@ -4,16 +4,22 @@ on:
   push:
     branches:
       - main
+      - dev
+      - qa
+      - uat
       - 'feature/**'
       - 'hotfix/**'
       - 'warranty/**'
       - 'debt/**'
       - 'sonar'
+      - 'R*-main'
   pull_request:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      nuget_version: ${{ steps.version.outputs.nuget_version }}
 
     steps:
       - name: Checkout (full history for NBGV)
@@ -68,14 +74,7 @@ jobs:
         run: dotnet restore VersioningPoC.sln
 
       - name: Build
-        run: |
-          if [[ "${{ steps.version.outputs.is_env_pr }}" == "true" ]]; then
-            dotnet build VersioningPoC.sln --configuration Release --no-restore \
-              -p:PackageVersion="${{ steps.version.outputs.nuget_version }}" \
-              -p:AssemblyInformationalVersion="${{ steps.version.outputs.asm_info }}"
-          else
-            dotnet build VersioningPoC.sln --configuration Release --no-restore
-          fi
+        run: dotnet build VersioningPoC.sln --configuration Release --no-restore
 
       - name: Test
         run: dotnet test VersioningPoC.sln --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage"
@@ -93,6 +92,16 @@ jobs:
           --configuration Release
           --no-build
           --output publish/worker
+
+      - name: Write CI version file
+        if: steps.version.outputs.is_env_pr == 'true'
+        run: echo "${{ steps.version.outputs.nuget_version }}" > publish/api/ci-version.txt
+
+      - name: Write CI branch file
+        run: |
+          BRANCH="${{ github.head_ref || github.ref_name }}"
+          echo "$BRANCH" > publish/api/ci-branch.txt
+          echo "$BRANCH" > publish/worker/ci-branch.txt
 
       - name: Upload API artifact
         uses: actions/upload-artifact@v4
@@ -117,3 +126,36 @@ jobs:
           echo "| SemVer | \`${{ steps.version.outputs.semver }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| NuGet  | \`${{ steps.version.outputs.nuget_version }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Artifacts | API + Worker |" >> $GITHUB_STEP_SUMMARY
+
+  deploy:
+    needs: build
+    runs-on: windows-latest
+    if: github.event_name == 'push' && (github.ref_name == 'dev' || github.ref_name == 'qa' || github.ref_name == 'uat')
+
+    steps:
+      - name: Download API artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: versioning-api-${{ needs.build.outputs.nuget_version }}
+          path: publish\api
+
+      - name: Install Web Deploy
+        run: choco install webdeploy --yes --no-progress
+
+      - name: Deploy API via WebDeploy
+        shell: pwsh
+        run: |
+          $msdeploy = "C:\Program Files\IIS\Microsoft Web Deploy V3\msdeploy.exe"
+          $source = "contentPath=${{ github.workspace }}\publish\api"
+          $dest   = "contentPath=${{ secrets.MSDEPLOY_SITE }},computerName=https://${{ secrets.MSDEPLOY_SERVER }}:8172/msdeploy.axd?site=${{ secrets.MSDEPLOY_SITE }},userName=${{ secrets.MSDEPLOY_USER }},password=${{ secrets.MSDEPLOY_PASSWORD }},authType=Basic"
+          & $msdeploy -verb:sync "-source:$source" "-dest:$dest" -allowUntrusted -enableRule:AppOffline
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Deploy summary
+        shell: pwsh
+        run: |
+          Add-Content $env:GITHUB_STEP_SUMMARY "### Deploy Summary`n"
+          Add-Content $env:GITHUB_STEP_SUMMARY "| Campo | Valor |`n|---|---|"
+          Add-Content $env:GITHUB_STEP_SUMMARY "| Versión desplegada | ``${{ needs.build.outputs.nuget_version }}`` |"
+          Add-Content $env:GITHUB_STEP_SUMMARY "| Ambiente | ``${{ github.ref_name }}`` |"
+          Add-Content $env:GITHUB_STEP_SUMMARY "| URL | http://poctest.runasp.net/version |"

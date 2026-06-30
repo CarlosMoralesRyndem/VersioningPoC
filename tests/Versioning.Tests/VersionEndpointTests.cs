@@ -31,10 +31,10 @@ public class VersionEndpointTests : IClassFixture<WebApplicationFactory<Program>
         var doc = JsonDocument.Parse(json).RootElement;
 
         Assert.True(doc.TryGetProperty("version", out _), "Response must contain 'version'");
-        Assert.True(doc.TryGetProperty("environment", out _), "Response must contain 'environment'");
         Assert.True(doc.TryGetProperty("branch", out _), "Response must contain 'branch'");
         Assert.True(doc.TryGetProperty("commit", out _), "Response must contain 'commit'");
         Assert.True(doc.TryGetProperty("buildDate", out _), "Response must contain 'buildDate'");
+        Assert.False(doc.TryGetProperty("environment", out _), "Response must not contain 'environment'");
     }
 
     [Fact]

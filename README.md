@@ -16,6 +16,8 @@ Prueba de concepto (PoC) de una estrategia completa de versionado basada en **Se
 - [Inicio rápido](#inicio-rápido)
 - [Pipeline CI/CD](#pipeline-cicd)
 - [Casos de prueba del versionado](#casos-de-prueba-del-versionado)
+- [Validación en servidor](#validación-en-servidor)
+- [Worker Service](#worker-service)
 - [Reutilización en otras soluciones](#reutilización-en-otras-soluciones)
 
 ---
@@ -32,6 +34,7 @@ Prueba de concepto (PoC) de una estrategia completa de versionado basada en **Se
 | Endpoint REST | `GET /version` (API) |
 | Worker | Log de versión al arranque |
 | CI/CD | GitHub Actions |
+| Servidor de validación | `http://poctest.runasp.net/version` (runasp.net, WebDeploy) |
 
 ---
 
@@ -56,7 +59,8 @@ VersioningPoC/
 │   │   ├── VersionLoggerService.cs
 │   │   └── Versioning.Worker.csproj
 │   │
-│   └── Versioning.Core/          # Librería de dominio (reutilizable)
+│   └── Versioning.Core/          # Librería compartida: BuildInfo (Version, Branch, Commit)
+│       ├── BuildInfo.cs
 │       └── Versioning.Core.csproj
 │
 ├── tests/
@@ -93,10 +97,10 @@ MAJOR.MINOR.PATCH-g{hash}          ← non-public      (feature/*, debt/*, warra
 > MAJOR.MINOR.PATCH-pr{N}            ← PR a ambiente   (dev, qa, uat)
 > MAJOR.FORK.PATCH-pr{N}             ← PR a ambiente   (con fork configurado)
 > ```
-> Esta lógica es custom y está habilitada en el workflow, pero no forma parte del estándar de NBGV.
+> Esta lógica es custom y está habilitada en el workflow, pero no aplica al deploy (que ocurre post-merge).
 
 Ejemplos:
-- `main` → `NuGetPackageVersion: 1.0.10` / `AssemblyInformationalVersion: 1.0.10+5d54999cf4`
+- `main` → `NuGetPackageVersion: 1.0.31` / `AssemblyInformationalVersion: 1.0.31+39d7fece7d`
 - `feature/login` → `NuGetPackageVersion: 1.0.11-gd0e49296a5` / `AssemblyInformationalVersion: 1.0.11+d0e49296a5`
 - `R14-main` → `NuGetPackageVersion: 1.0.10` (public release del fork)
 - PR #42 → `dev` (sin fork) → `1.0.10-pr42` *(alternativa custom)*
@@ -108,7 +112,7 @@ Ejemplos:
 
 | Escenario | `NuGetPackageVersion` | `AssemblyInformationalVersion` |
 |---|---|---|
-| Public release (`main`) | `1.0.10` | `1.0.10+5d54999cf4` |
+| Public release (`main`) | `1.0.31` | `1.0.31+39d7fece7d` |
 | Non-public (`feature/*`) | `1.0.11-gd0e49296a5` | `1.0.11+d0e49296a5` |
 | PR a ambiente (sin fork) | `1.0.10-pr42` | `1.0.10-pr42` |
 | PR a ambiente (fork R14) | `1.14.10-pr42` | `1.14.10-pr42` |
@@ -117,21 +121,21 @@ Ejemplos:
 
 ## Estrategia por rama
 
-NBGV distingue dos tipos de rama: **public release** y **non-public release**, controlado por `publicReleaseRefSpec`. El CI extiende esto con versiones de PR para las ramas de ambiente.
+NBGV distingue dos tipos de rama: **public release** y **non-public release**, controlado por `publicReleaseRefSpec`.
 
-| Trigger | Rama / Destino | Tipo | Ejemplo de versión |
-|---|---|---|---|
-| push | `main` | Public release | `1.0.15` |
-| push | `hotfix/*` | Public release | `1.0.15` |
-| push | `<ID>-main` (ej. `R14-main`) | Public release (fork) | `1.0.15` |
-| push | `feature/*`, `debt/*`, `warranty/*`, otras | Non-public | `1.0.15-g1a2b3c4` |
-| pull_request | → `dev` | Ambiente CI *(alternativa custom)* | `1.0.15-pr42` |
-| pull_request | → `qa` | Ambiente CI *(alternativa custom)* | `1.0.15-pr42` |
-| pull_request | → `uat` | Ambiente CI *(alternativa custom)* | `1.0.15-pr42` |
+| Trigger | Rama | Tipo | Versión generada | Deploy |
+|---|---|---|---|---|
+| push | `main` | Public release | `1.0.31` | No |
+| push | `hotfix/*` | Public release | `1.0.31` | No |
+| push | `<ID>-main` (ej. `R14-main`) | Public release (fork) | `1.0.31` | No |
+| push | `feature/*`, `debt/*`, `warranty/*`, otras | Non-public | `1.0.31-g1a2b3c4` | No |
+| push (post-merge) | `dev` | Ambiente CI | `1.0.31+{hash}` | **Sí** |
+| push (post-merge) | `qa` | Ambiente CI | `1.0.31+{hash}` | **Sí** |
+| push (post-merge) | `uat` | Ambiente CI | `1.0.31+{hash}` | **Sí** |
 
 - **Public release**: versión limpia sin sufijo, lista para producción.
 - **Non-public**: versión con `-g{hash}` del commit, identifica builds de desarrollo.
-- **PR a ambiente**: versión con `-pr{N}` donde N es el número de PR de GitHub; si hay fork configurado, el MINOR refleja el número de fork.
+- **Ambientes**: el deploy se dispara en el push **post-merge** (no al abrir el PR). Cada merge a `dev`/`qa`/`uat` sobreescribe el servidor.
 
 > Para labels semánticos por rama (`preview`, `rc`, incremento de MINOR automático), la herramienta indicada es **GitVersion**, no NBGV. NBGV prioriza simplicidad: el patch crece con la altura de commits y el hash identifica el origen.
 
@@ -141,7 +145,7 @@ NBGV distingue dos tipos de rama: **public release** y **non-public release**, c
 
 ### PR como identificador de versión en ambientes
 
-Cuando se abre un PR hacia `develop`, `qa` o `uat`, el CI calcula una versión que usa el número de PR en lugar del hash del commit:
+El CI calcula una versión con el número de PR para los builds de pull request hacia `dev`, `qa` o `uat`. Esta versión aparece en los artefactos del PR pero **no es la que se deploya** — el deploy ocurre cuando el PR se mergea:
 
 ```
 Sin fork:   1.0.{height}-pr{PR_NUMBER}     →  1.0.15-pr42
@@ -149,7 +153,7 @@ Con fork:   1.{fork}.{height}-pr{PR_NUMBER} →  1.14.15-pr42
 ```
 
 Esto permite:
-- Trazar exactamente qué PR está desplegado en cada ambiente.
+- Identificar en los artefactos de CI exactamente qué PR fue buildeado.
 - Nombrar los artefactos de forma legible: `versioning-api-1.14.15-pr42`.
 - Ordenar versiones cronológicamente (el height sigue siendo el contador de commits).
 
@@ -208,6 +212,18 @@ Controla la versión base, las ramas public release y el identificador de fork:
 | `publicReleaseRefSpec` | Expresiones regulares que identifican ramas de release público |
 | `fork` | Identificador de fork (ej. `"R14"`); `null` en el repositorio principal |
 
+### `src/Versioning.Core/BuildInfo.cs`
+
+Librería compartida que resuelve en runtime los tres valores de trazabilidad. Tanto la API como el Worker la consumen:
+
+| Propiedad | Lógica de resolución |
+|---|---|
+| `Version` | Lee `ci-branch.txt` si existe; si no, usa `AssemblyInformationalVersionAttribute` vía reflection |
+| `Branch` | Lee `ci-branch.txt` → `GITHUB_REF_NAME` → `GIT_BRANCH` → `git rev-parse --abbrev-ref HEAD` → `"unknown"` |
+| `Commit` | Extrae el hash tras `+` o `-g` de la versión; `"unknown"` si no hay separador |
+
+El archivo `ci-branch.txt` es escrito por el CI en el output de publish (`publish/api/` y `publish/worker/`), por lo que el artifact deployado siempre conoce su rama de origen.
+
 ### `Directory.Build.props`
 
 Propiedades MSBuild compartidas por todos los proyectos de la solución:
@@ -252,11 +268,10 @@ GET /version
 
 ```json
 {
-  "version": "1.0.14+ca5fb45035",
-  "environment": "Development",
-  "branch": "main",
-  "commit": "ca5fb45035",
-  "buildDate": "2026-06-30T00:23:52Z"
+  "version": "1.0.32+d6f63b5a58",
+  "branch": "dev",
+  "commit": "d6f63b5a58",
+  "buildDate": "2026-06-30T22:17:21Z"
 }
 ```
 
@@ -264,11 +279,12 @@ GET /version
 
 | Campo | Origen |
 |---|---|
-| `version` | `ThisAssembly.AssemblyInformationalVersion` (NBGV o CI override) |
-| `environment` | `IHostEnvironment.EnvironmentName` |
-| `branch` | `GITHUB_REF_NAME` → `GIT_BRANCH` → `git rev-parse --abbrev-ref HEAD` (local) → `"unknown"` |
+| `version` | `ThisAssembly.AssemblyInformationalVersion` (NBGV) |
+| `branch` | `ci-branch.txt` (escrito por CI) → `GITHUB_REF_NAME` → `GIT_BRANCH` → `git rev-parse --abbrev-ref HEAD` (local) → `"unknown"` |
 | `commit` | Extraído tras el separador `+` (o `-g` en formato legacy); `"unknown"` en PR builds |
 | `buildDate` | `DateTime.UtcNow` en el momento de la request |
+
+El campo `branch` se resuelve correctamente en producción gracias a `ci-branch.txt`: el CI escribe el nombre de la rama (`github.head_ref || github.ref_name`) en el output de publish, y `BuildInfo` lo lee al arrancar la aplicación.
 
 ---
 
@@ -327,33 +343,50 @@ El archivo `.github/workflows/dotnet-ci.yml` ejecuta automáticamente en cada pu
 | Install NBGV CLI | `dotnet tool install --global nbgv` |
 | Detect version | Calcula la versión según el trigger (ver lógica abajo) |
 | Restore | `dotnet restore` |
-| Build | `dotnet build --configuration Release` con override de versión si aplica |
+| Build | `dotnet build --configuration Release` |
 | Test | `dotnet test` con recolección de cobertura |
 | Publish API | `dotnet publish` de la API |
 | Publish Worker | `dotnet publish` del Worker |
+| Write CI version file | Escribe `ci-version.txt` en el artifact (solo en PR builds a ambientes) |
+| Write CI branch file | Escribe `ci-branch.txt` en el artifact (siempre; permite resolver `branch` en producción) |
 | Upload artifacts | Artefactos nombrados `versioning-api-{version}` y `versioning-worker-{version}` |
 | Summary | Tabla Branch / SemVer / NuGet en la UI de GitHub Actions |
 
 ### Lógica de versión en el CI
 
 ```
-┌─ ¿Es pull_request a develop, qa o uat?
+┌─ ¿Es pull_request a dev, qa o uat?
 │
 ├── SÍ → Lee fork de version.json
 │         ├── fork = null  →  {SimpleVersion}-pr{N}         (ej. 1.0.15-pr42)
 │         └── fork = "R14" →  {Major}.{14}.{Height}-pr{N}  (ej. 1.14.15-pr42)
 │
 └── NO  → NBGV calcula la versión normalmente
-           ├── public release  →  1.0.15
-           └── non-public      →  1.0.15-g1a2b3c4
+           ├── public release  →  1.0.31
+           └── non-public      →  1.0.31-g1a2b3c4
 ```
+
+### Lógica de deploy
+
+El job `deploy` solo se ejecuta en push a `dev`, `qa` o `uat` — es decir, **después de que un PR es mergeado**, no al abrirlo:
+
+```
+push a dev / qa / uat
+    └── build + test + publish
+    └── write ci-branch.txt  (con nombre de la rama)
+    └── upload artifact
+    └── deploy → WebDeploy → poctest.runasp.net
+```
+
+Push a `main`, `feature/*`, `hotfix/*`, etc. solo ejecuta build y tests; no deploya.
 
 ### Triggers
 
-| Trigger | Ramas |
-|---|---|
-| push | `main`, `feature/**`, `hotfix/**`, `warranty/**`, `debt/**`, `sonar` |
-| pull_request | todas las ramas (lógica de versión PR aplica solo a `dev`, `qa`, `uat`) |
+| Trigger | Ramas | Deploy |
+|---|---|---|
+| push | `main`, `feature/**`, `hotfix/**`, `warranty/**`, `debt/**`, `sonar`, `R*-main` | No |
+| push | `dev`, `qa`, `uat` | **Sí** |
+| pull_request | todas las ramas | No |
 
 ---
 
@@ -361,15 +394,36 @@ El archivo `.github/workflows/dotnet-ci.yml` ejecuta automáticamente en cada pu
 
 | Trigger | Rama / Destino PR | fork en version.json | Versión generada |
 |---|---|---|---|
-| push | `main` | cualquiera | `1.0.15` |
-| push | `hotfix/bug` | cualquiera | `1.0.15` |
-| push | `R14-main` | cualquiera | `1.0.15` |
-| push | `feature/algo` | cualquiera | `1.0.15-g1a2b3c4` |
-| push | `debt/algo`, `warranty/algo` | cualquiera | `1.0.15-g1a2b3c4` |
-| pull_request | → `dev` | `null` | `1.0.15-pr42` *(custom)* |
-| pull_request | → `qa` | `null` | `1.0.15-pr7` *(custom)* |
-| pull_request | → `uat` | `"R14"` | `1.14.15-pr3` *(custom)* |
-| pull_request | → `main` | cualquiera | `1.0.15-g1a2b3c4` (NBGV, sin cambio) |
+| push | `main` | cualquiera | `1.0.31` |
+| push | `hotfix/bug` | cualquiera | `1.0.31` |
+| push | `R14-main` | cualquiera | `1.0.31` |
+| push | `feature/algo` | cualquiera | `1.0.31-g1a2b3c4` |
+| push | `debt/algo`, `warranty/algo` | cualquiera | `1.0.31-g1a2b3c4` |
+| push (post-merge) | `dev` | cualquiera | `1.0.31+{hash}` ✓ deploya |
+| push (post-merge) | `qa` | cualquiera | `1.0.31+{hash}` ✓ deploya |
+| push (post-merge) | `uat` | cualquiera | `1.0.32+{hash}` ✓ deploya |
+| pull_request | → `dev` | `null` | `1.0.15-pr42` *(artefacto CI, no deploya)* |
+| pull_request | → `qa` | `null` | `1.0.15-pr7` *(artefacto CI, no deploya)* |
+| pull_request | → `uat` | `"R14"` | `1.14.15-pr3` *(artefacto CI, no deploya)* |
+| pull_request | → `main` | cualquiera | `1.0.31-g1a2b3c4` (NBGV, sin cambio) |
+
+---
+
+## Validación en servidor
+
+Validado en `http://poctest.runasp.net/version` el 2026-06-30 con el flujo completo `dev` → `qa` → `uat`.
+
+| Merge a | `branch` | `version` | `commit` |
+|---|---|---|---|
+| `dev` | `"dev"` | `1.0.30+e9427b9338` | `e9427b9338` |
+| `qa` | `"qa"` | `1.0.31+39d7fece7d` | `39d7fece7d` |
+| `uat` | `"uat"` | `1.0.32+3ed33fa37d` | `3ed33fa37d` |
+
+Comportamiento confirmado:
+- Cada push post-merge dispara build + deploy automáticamente.
+- El servidor se sobreescribe con el artifact de la rama mergeada.
+- El campo `branch` refleja correctamente la rama de ambiente (no `"unknown"`).
+- `main` solo hace build y tests; no deploya al servidor.
 
 ---
 
@@ -383,15 +437,14 @@ Al iniciar, `VersionLoggerService` emite un log estructurado:
 
 ```
 info: VersionLoggerService[0]
-      Worker started | Version=1.14.15-pr42 | Branch=dev | Commit=unknown | Environment=Production
+      Worker started | Version=1.0.32+d6f63b5a58 | Branch=dev | Commit=d6f63b5a58
 ```
 
 | Campo | Origen |
 |---|---|
-| `Version` | `ThisAssembly.AssemblyInformationalVersion` (NBGV o CI override) |
-| `Branch` | Variable de entorno `GITHUB_REF_NAME` / `GIT_BRANCH` |
+| `Version` | `ThisAssembly.AssemblyInformationalVersion` (NBGV) |
+| `Branch` | `ci-branch.txt` → `GITHUB_REF_NAME` → `GIT_BRANCH` |
 | `Commit` | Extraído del sufijo de versión; `"unknown"` en PR builds |
-| `Environment` | `IHostEnvironment.EnvironmentName` |
 
 ### Diferencia clave con la API
 

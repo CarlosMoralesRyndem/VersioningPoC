@@ -393,8 +393,8 @@ info: VersionLoggerService[0]
 |---|---|---|
 | SDK | `Microsoft.NET.Sdk.Web` | `Microsoft.NET.Sdk.Worker` |
 | Expone versión vía | Endpoint `GET /version` | Log al arranque |
-| `ThisAssembly` | ✅ | ✅ |
-| `version.json` | ✅ (compartido) | ✅ (compartido) |
+| `ThisAssembly` | Si | Si |
+| `version.json` | Si (compartido) | Si (compartido) |
 
 ---
 

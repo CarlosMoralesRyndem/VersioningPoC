@@ -9,6 +9,7 @@ on:
       - 'warranty/**'
       - 'debt/**'
       - 'sonar'
+      - 'R*-main'
   pull_request:
 
 jobs:

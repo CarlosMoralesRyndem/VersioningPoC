@@ -352,8 +352,8 @@ El archivo `.github/workflows/dotnet-ci.yml` ejecuta automáticamente en cada pu
 
 | Trigger | Ramas |
 |---|---|
-| push | `main`, `feature/**`, `release/**`, `hotfix/**` |
-| pull_request | todas las ramas (lógica de versión PR aplica solo a `develop`, `qa`, `uat`) |
+| push | `main`, `feature/**`, `hotfix/**`, `warranty/**`, `debt/**`, `sonar` |
+| pull_request | todas las ramas (lógica de versión PR aplica solo a `dev`, `qa`, `uat`) |
 
 ---
 
@@ -383,7 +383,7 @@ Al iniciar, `VersionLoggerService` emite un log estructurado:
 
 ```
 info: VersionLoggerService[0]
-      Worker started | Version=1.14.15-pr42 | Branch=develop | Commit=unknown | Environment=Production
+      Worker started | Version=1.14.15-pr42 | Branch=dev | Commit=unknown | Environment=Production
 ```
 
 | Campo | Origen |

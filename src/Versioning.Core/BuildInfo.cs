@@ -7,11 +7,17 @@ public static class BuildInfo
     public static readonly string Branch = ResolveBranch();
     public static readonly string Commit = ResolveCommit();
 
-    private static string ResolveVersion() =>
-        Assembly.GetExecutingAssembly()
+    private static string ResolveVersion()
+    {
+        var ciFile = Path.Combine(AppContext.BaseDirectory, "ci-version.txt");
+        if (File.Exists(ciFile))
+            return File.ReadAllText(ciFile).Trim();
+
+        return Assembly.GetExecutingAssembly()
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
             ?.InformationalVersion
-        ?? ThisAssembly.AssemblyInformationalVersion;
+            ?? ThisAssembly.AssemblyInformationalVersion;
+    }
 
     private static string ResolveBranch()
     {

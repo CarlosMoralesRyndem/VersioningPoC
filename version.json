@@ -6,5 +6,5 @@
     "^refs/heads/release/.*$",
     "^refs/heads/hotfix/.*$"
   ],
-  "fork": null
+  "fork": "R14"
 }

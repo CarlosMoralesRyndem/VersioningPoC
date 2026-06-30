@@ -71,14 +71,7 @@ jobs:
         run: dotnet restore VersioningPoC.sln
 
       - name: Build
-        run: |
-          if [[ "${{ steps.version.outputs.is_env_pr }}" == "true" ]]; then
-            dotnet build VersioningPoC.sln --configuration Release --no-restore \
-              -p:PackageVersion="${{ steps.version.outputs.nuget_version }}" \
-              -p:AssemblyInformationalVersion="${{ steps.version.outputs.asm_info }}"
-          else
-            dotnet build VersioningPoC.sln --configuration Release --no-restore
-          fi
+        run: dotnet build VersioningPoC.sln --configuration Release --no-restore
 
       - name: Test
         run: dotnet test VersioningPoC.sln --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage"
@@ -96,6 +89,10 @@ jobs:
           --configuration Release
           --no-build
           --output publish/worker
+
+      - name: Write CI version file
+        if: steps.version.outputs.is_env_pr == 'true'
+        run: echo "${{ steps.version.outputs.nuget_version }}" > publish/api/ci-version.txt
 
       - name: Upload API artifact
         uses: actions/upload-artifact@v4

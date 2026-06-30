@@ -247,11 +247,11 @@ GET /version
 
 ```json
 {
-  "version": "1.0.15-pr42",
-  "environment": "Production",
-  "branch": "develop",
-  "commit": "unknown",
-  "buildDate": "2026-06-29T10:30:00Z"
+  "version": "1.0.14+ca5fb45035",
+  "environment": "Development",
+  "branch": "main",
+  "commit": "ca5fb45035",
+  "buildDate": "2026-06-30T00:23:52Z"
 }
 ```
 
@@ -261,7 +261,7 @@ GET /version
 |---|---|
 | `version` | `ThisAssembly.AssemblyInformationalVersion` (NBGV o CI override) |
 | `environment` | `IHostEnvironment.EnvironmentName` |
-| `branch` | Variable de entorno `GITHUB_REF_NAME` / `GIT_BRANCH` |
+| `branch` | `GITHUB_REF_NAME` → `GIT_BRANCH` → `git rev-parse --abbrev-ref HEAD` (local) → `"unknown"` |
 | `commit` | Extraído tras el separador `+` (o `-g` en formato legacy); `"unknown"` en PR builds |
 | `buildDate` | `DateTime.UtcNow` en el momento de la request |
 

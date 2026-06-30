@@ -71,10 +71,10 @@ curl http://localhost:51461/version
 **Respuesta esperada (en `main`, local):**
 ```json
 {
-  "version": "1.0.10+5d54999cf4",
+  "version": "1.0.{altura}+{hash}",
   "environment": "Development",
-  "branch": "local",
-  "commit": "5d54999cf4",
+  "branch": "main",
+  "commit": "{hash}",
   "buildDate": "..."
 }
 ```
@@ -84,6 +84,7 @@ curl http://localhost:51461/version
 - [ ] Sigue el patrón `MAJOR.MINOR.PATCH+{hash}`
 - [ ] El campo `commit` coincide con `git rev-parse --short HEAD`
 - [ ] `environment` es `Development` en local
+- [ ] `branch` muestra el nombre real de la rama (no `"local"`)
 
 **Resultado real:**
 
@@ -93,18 +94,18 @@ Puertos: https://localhost:51460 · http://localhost:51461
 
 ```json
 {
-  "version": "1.0.10+5d54999cf4",
+  "version": "1.0.14+ca5fb45035",
   "environment": "Development",
-  "branch": "local",
-  "commit": "5d54999cf4",
-  "buildDate": "2026-06-29T23:08:xx.xxxxZ"
+  "branch": "main",
+  "commit": "ca5fb45035",
+  "buildDate": "2026-06-30T00:23:52.4323318Z"
 }
 ```
 
-- [x] `version` = `1.0.10+5d54999cf4`
-- [x] `commit` = `5d54999cf4` (extraído tras el separador `+`)
+- [x] `version` = `1.0.14+ca5fb45035`
+- [x] `commit` = `ca5fb45035` (extraído tras el separador `+`)
 - [x] `environment` = `Development`
-- [x] `branch` = `local` (sin variable de entorno `GITHUB_REF_NAME`)
+- [x] `branch` = `main` (detectado via `git rev-parse --abbrev-ref HEAD`)
 
 > El separador `+` es siempre el que usa NBGV 3.8 en `AssemblyInformationalVersion`, tanto en public como non-public release. El código busca primero `-g` (legacy) y luego `+`.
 

@@ -3,8 +3,8 @@
   "version": "1.0",
   "publicReleaseRefSpec": [
     "^refs/heads/main$",
-    "^refs/heads/release/.*$",
-    "^refs/heads/hotfix/.*$"
+    "^refs/heads/hotfix/.*$",
+    "^refs/heads/R\\d+-main$"
   ],
   "fork": null
 }

@@ -5,8 +5,10 @@ on:
     branches:
       - main
       - 'feature/**'
-      - 'release/**'
       - 'hotfix/**'
+      - 'warranty/**'
+      - 'debt/**'
+      - 'sonar'
   pull_request:
 
 jobs:
@@ -35,7 +37,7 @@ jobs:
           FORK_NUM=$(echo "$FORK_RAW" | tr -d '[:alpha:]')  # "R14" → "14"
 
           if [[ "${{ github.event_name }}" == "pull_request" && \
-                ( "$TARGET" == "develop" || "$TARGET" == "qa" || "$TARGET" == "uat" ) ]]; then
+                ( "$TARGET" == "dev" || "$TARGET" == "qa" || "$TARGET" == "uat" ) ]]; then
             IS_ENV_PR=true
             SIMPLE=$(nbgv get-version -v SimpleVersion)
             MAJOR=$(echo "$SIMPLE" | cut -d'.' -f1)

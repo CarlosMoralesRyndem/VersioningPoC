@@ -83,19 +83,24 @@ NBGV calcula la versión automáticamente combinando:
 ### Formato generado
 
 ```
-MAJOR.MINOR.PATCH+{hash}           ← public release  (main, release/*, hotfix/*)
-MAJOR.MINOR.PATCH+{hash}           ← non-public      (feature/* y otras) — AssemblyInformationalVersion
-MAJOR.MINOR.PATCH-g{hash}          ← non-public      (feature/* y otras) — NuGetPackageVersion
-MAJOR.MINOR.PATCH-pr{N}            ← PR a ambiente   (develop, qa, uat)
-MAJOR.FORK.PATCH-pr{N}             ← PR a ambiente   (con fork configurado)
+MAJOR.MINOR.PATCH+{hash}           ← public release  (main, hotfix/*, <ID>-main)
+MAJOR.MINOR.PATCH+{hash}           ← non-public      (feature/*, debt/*, warranty/*, otras) — AssemblyInformationalVersion
+MAJOR.MINOR.PATCH-g{hash}          ← non-public      (feature/*, debt/*, warranty/*, otras) — NuGetPackageVersion
 ```
+
+> **Alternativa documentada (no estándar NBGV):** El CI puede sobrescribir la versión en PRs hacia ambientes (`dev`, `qa`, `uat`) para incluir el número de PR como trazabilidad:
+> ```
+> MAJOR.MINOR.PATCH-pr{N}            ← PR a ambiente   (dev, qa, uat)
+> MAJOR.FORK.PATCH-pr{N}             ← PR a ambiente   (con fork configurado)
+> ```
+> Esta lógica es custom y está habilitada en el workflow, pero no forma parte del estándar de NBGV.
 
 Ejemplos:
 - `main` → `NuGetPackageVersion: 1.0.10` / `AssemblyInformationalVersion: 1.0.10+5d54999cf4`
 - `feature/login` → `NuGetPackageVersion: 1.0.11-gd0e49296a5` / `AssemblyInformationalVersion: 1.0.11+d0e49296a5`
-- `release/1.1` → `NuGetPackageVersion: 1.0.10`
-- PR #42 → `develop` (sin fork) → `1.0.10-pr42`
-- PR #42 → `develop` (fork R14) → `1.14.10-pr42`
+- `R14-main` → `NuGetPackageVersion: 1.0.10` (public release del fork)
+- PR #42 → `dev` (sin fork) → `1.0.10-pr42` *(alternativa custom)*
+- PR #42 → `dev` (fork R14) → `1.14.10-pr42` *(alternativa custom)*
 
 > `AssemblyInformationalVersion` usa siempre `+{hash}` como separador (tanto public como non-public). El sufijo `-g{hash}` aparece únicamente en `NuGetPackageVersion` para ramas non-public.
 
@@ -117,12 +122,12 @@ NBGV distingue dos tipos de rama: **public release** y **non-public release**, c
 | Trigger | Rama / Destino | Tipo | Ejemplo de versión |
 |---|---|---|---|
 | push | `main` | Public release | `1.0.15` |
-| push | `release/*` | Public release | `1.0.15` |
 | push | `hotfix/*` | Public release | `1.0.15` |
-| push | `feature/*` u otras | Non-public | `1.0.15-g1a2b3c4` |
-| pull_request | → `develop` | Ambiente CI | `1.0.15-pr42` |
-| pull_request | → `qa` | Ambiente CI | `1.0.15-pr42` |
-| pull_request | → `uat` | Ambiente CI | `1.0.15-pr42` |
+| push | `<ID>-main` (ej. `R14-main`) | Public release (fork) | `1.0.15` |
+| push | `feature/*`, `debt/*`, `warranty/*`, otras | Non-public | `1.0.15-g1a2b3c4` |
+| pull_request | → `dev` | Ambiente CI *(alternativa custom)* | `1.0.15-pr42` |
+| pull_request | → `qa` | Ambiente CI *(alternativa custom)* | `1.0.15-pr42` |
+| pull_request | → `uat` | Ambiente CI *(alternativa custom)* | `1.0.15-pr42` |
 
 - **Public release**: versión limpia sin sufijo, lista para producción.
 - **Non-public**: versión con `-g{hash}` del commit, identifica builds de desarrollo.
@@ -357,12 +362,13 @@ El archivo `.github/workflows/dotnet-ci.yml` ejecuta automáticamente en cada pu
 | Trigger | Rama / Destino PR | fork en version.json | Versión generada |
 |---|---|---|---|
 | push | `main` | cualquiera | `1.0.15` |
-| push | `release/1.1` | cualquiera | `1.0.15` |
 | push | `hotfix/bug` | cualquiera | `1.0.15` |
+| push | `R14-main` | cualquiera | `1.0.15` |
 | push | `feature/algo` | cualquiera | `1.0.15-g1a2b3c4` |
-| pull_request | → `develop` | `null` | `1.0.15-pr42` |
-| pull_request | → `qa` | `null` | `1.0.15-pr7` |
-| pull_request | → `uat` | `"R14"` | `1.14.15-pr3` |
+| push | `debt/algo`, `warranty/algo` | cualquiera | `1.0.15-g1a2b3c4` |
+| pull_request | → `dev` | `null` | `1.0.15-pr42` *(custom)* |
+| pull_request | → `qa` | `null` | `1.0.15-pr7` *(custom)* |
+| pull_request | → `uat` | `"R14"` | `1.14.15-pr3` *(custom)* |
 | pull_request | → `main` | cualquiera | `1.0.15-g1a2b3c4` (NBGV, sin cambio) |
 
 ---

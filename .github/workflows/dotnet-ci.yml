@@ -140,11 +140,9 @@ jobs:
         shell: pwsh
         run: |
           $msdeploy = "C:\Program Files\IIS\Microsoft Web Deploy V3\msdeploy.exe"
-          & $msdeploy `
-            -verb:sync `
-            -source:contentPath="${{ github.workspace }}\publish\api" `
-            -dest:contentPath="${{ secrets.MSDEPLOY_SITE }}",computerName="https://${{ secrets.MSDEPLOY_SERVER }}:8172/msdeploy.axd?site=${{ secrets.MSDEPLOY_SITE }}",userName="${{ secrets.MSDEPLOY_USER }}",password="${{ secrets.MSDEPLOY_PASSWORD }}",authType="Basic" `
-            -allowUntrusted
+          $source = "contentPath=${{ github.workspace }}\publish\api"
+          $dest   = "contentPath=${{ secrets.MSDEPLOY_SITE }},computerName=https://${{ secrets.MSDEPLOY_SERVER }}:8172/msdeploy.axd?site=${{ secrets.MSDEPLOY_SITE }},userName=${{ secrets.MSDEPLOY_USER }},password=${{ secrets.MSDEPLOY_PASSWORD }},authType=Basic"
+          & $msdeploy -verb:sync "-source:$source" "-dest:$dest" -allowUntrusted
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Deploy summary

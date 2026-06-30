@@ -254,11 +254,10 @@ GET /version
 
 ```json
 {
-  "version": "1.0.32+3ed33fa37d",
-  "environment": "Production",
-  "branch": "uat",
-  "commit": "3ed33fa37d",
-  "buildDate": "2026-06-30T21:59:31Z"
+  "version": "1.0.32+d6f63b5a58",
+  "branch": "dev",
+  "commit": "d6f63b5a58",
+  "buildDate": "2026-06-30T22:17:21Z"
 }
 ```
 
@@ -267,7 +266,6 @@ GET /version
 | Campo | Origen |
 |---|---|
 | `version` | `ThisAssembly.AssemblyInformationalVersion` (NBGV) |
-| `environment` | `IHostEnvironment.EnvironmentName` (`ASPNETCORE_ENVIRONMENT`; default `"Production"`) |
 | `branch` | `ci-branch.txt` (escrito por CI) → `GITHUB_REF_NAME` → `GIT_BRANCH` → `git rev-parse --abbrev-ref HEAD` (local) → `"unknown"` |
 | `commit` | Extraído tras el separador `+` (o `-g` en formato legacy); `"unknown"` en PR builds |
 | `buildDate` | `DateTime.UtcNow` en el momento de la request |
@@ -411,7 +409,6 @@ Comportamiento confirmado:
 - Cada push post-merge dispara build + deploy automáticamente.
 - El servidor se sobreescribe con el artifact de la rama mergeada.
 - El campo `branch` refleja correctamente la rama de ambiente (no `"unknown"`).
-- El campo `environment` es `"Production"` porque `ASPNETCORE_ENVIRONMENT` no está configurada en runasp.net (default de .NET).
 - `main` solo hace build y tests; no deploya al servidor.
 
 ---
@@ -426,7 +423,7 @@ Al iniciar, `VersionLoggerService` emite un log estructurado:
 
 ```
 info: VersionLoggerService[0]
-      Worker started | Version=1.0.32+3ed33fa37d | Branch=uat | Commit=3ed33fa37d | Environment=Production
+      Worker started | Version=1.0.32+d6f63b5a58 | Branch=dev | Commit=d6f63b5a58
 ```
 
 | Campo | Origen |
@@ -434,7 +431,6 @@ info: VersionLoggerService[0]
 | `Version` | `ThisAssembly.AssemblyInformationalVersion` (NBGV) |
 | `Branch` | `ci-branch.txt` → `GITHUB_REF_NAME` → `GIT_BRANCH` |
 | `Commit` | Extraído del sufijo de versión; `"unknown"` en PR builds |
-| `Environment` | `IHostEnvironment.EnvironmentName` |
 
 ### Diferencia clave con la API
 

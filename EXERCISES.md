@@ -387,6 +387,21 @@ Luego en GitHub → abrir PR desde `feature/nueva-funcionalidad` → hacia `deve
 - [ ] La versión usa el esquema NBGV normal (`1.0.10-gd0e49296a5`)
 - [ ] El número de PR **no** aparece en la versión
 
+**Resultado real contraejemplo** — run `28412376086` (PR #2: `feature/ej10-contraejemplo` → `main`):
+
+```
+Branch  : main
+Version : 1.0.18-g3d977ea879
+
+Artefactos generados:
+  versioning-api-1.0.18-g3d977ea879
+  versioning-worker-1.0.18-g3d977ea879
+```
+
+- [x] `is_env_pr=false` — destino `main` no activa el esquema de PR
+- [x] Versión con sufijo NBGV `-g{hash}` (non-public, rama source)
+- [x] Número de PR **no** aparece en la versión ni en los artefactos
+
 **Resultado real** — run `28410770866` (PR #1: `feature/ej10-pr-version` → `develop`, fork `null`):
 
 ```

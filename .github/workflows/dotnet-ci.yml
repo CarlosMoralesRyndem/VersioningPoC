@@ -142,7 +142,7 @@ jobs:
           $msdeploy = "C:\Program Files\IIS\Microsoft Web Deploy V3\msdeploy.exe"
           $source = "contentPath=${{ github.workspace }}\publish\api"
           $dest   = "contentPath=${{ secrets.MSDEPLOY_SITE }},computerName=https://${{ secrets.MSDEPLOY_SERVER }}:8172/msdeploy.axd?site=${{ secrets.MSDEPLOY_SITE }},userName=${{ secrets.MSDEPLOY_USER }},password=${{ secrets.MSDEPLOY_PASSWORD }},authType=Basic"
-          & $msdeploy -verb:sync "-source:$source" "-dest:$dest" -allowUntrusted
+          & $msdeploy -verb:sync "-source:$source" "-dest:$dest" -allowUntrusted -enableRule:AppOffline
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Deploy summary

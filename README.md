@@ -411,19 +411,40 @@ Push a `main`, `feature/*`, `hotfix/*`, etc. solo ejecuta build y tests; no depl
 
 ## Validación en servidor
 
-Validado en `http://poctest.runasp.net/version` el 2026-06-30 con el flujo completo `dev` → `qa` → `uat`.
+Validado en `http://poctest.runasp.net/version` el 2026-06-30 con el flujo completo `dev` → `qa` → `uat` → `main`.
 
-| Merge a | `branch` | `version` | `commit` |
-|---|---|---|---|
-| `dev` | `"dev"` | `1.0.30+e9427b9338` | `e9427b9338` |
-| `qa` | `"qa"` | `1.0.31+39d7fece7d` | `39d7fece7d` |
-| `uat` | `"uat"` | `1.0.32+3ed33fa37d` | `3ed33fa37d` |
+### Flujo de ambientes
 
-Comportamiento confirmado:
-- Cada push post-merge dispara build + deploy automáticamente.
+| Merge a | `branch` | `version` | `commit` | Deploy |
+|---|---|---|---|---|
+| `dev` | `"dev"` | `1.0.34+beca95a44f` | `beca95a44f` | ✓ |
+| `qa` | `"qa"` | `1.0.31+39d7fece7d` | `39d7fece7d` | ✓ |
+| `uat` | `"uat"` | `1.0.32+3ed33fa37d` | `3ed33fa37d` | ✓ |
+
+### Resultado en `main`
+
+| Rama | `NuGetPackageVersion` | Deploy |
+|---|---|---|
+| `main` | `1.0.35` | No (solo build + test) |
+
+### Respuesta final del endpoint
+
+```json
+{
+  "version": "1.0.34+beca95a44f",
+  "branch": "dev",
+  "commit": "beca95a44f",
+  "buildDate": "2026-06-30T23:21:50Z"
+}
+```
+
+### Comportamiento confirmado
+
+- Cada push post-merge a `dev`/`qa`/`uat` dispara build + deploy automáticamente.
 - El servidor se sobreescribe con el artifact de la rama mergeada.
-- El campo `branch` refleja correctamente la rama de ambiente (no `"unknown"`).
-- `main` solo hace build y tests; no deploya al servidor.
+- El campo `branch` refleja correctamente la rama de ambiente (resuelto vía `ci-branch.txt`).
+- El campo `environment` fue eliminado — no aportaba valor en un servidor con una sola instancia.
+- `main` genera versión limpia (`1.0.35`, sin hash en NuGet) y no deploya al servidor.
 
 ---
 

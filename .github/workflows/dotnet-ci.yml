@@ -15,6 +15,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      nuget_version: ${{ steps.version.outputs.nuget_version }}
 
     steps:
       - name: Checkout (full history for NBGV)
@@ -118,3 +120,39 @@ jobs:
           echo "| SemVer | \`${{ steps.version.outputs.semver }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| NuGet  | \`${{ steps.version.outputs.nuget_version }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Artifacts | API + Worker |" >> $GITHUB_STEP_SUMMARY
+
+  deploy:
+    needs: build
+    runs-on: windows-latest
+    if: github.event_name == 'pull_request' && (github.base_ref == 'dev' || github.base_ref == 'qa' || github.base_ref == 'uat')
+
+    steps:
+      - name: Download API artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: versioning-api-${{ needs.build.outputs.nuget_version }}
+          path: publish\api
+
+      - name: Install Web Deploy
+        run: choco install webdeploy --yes --no-progress
+
+      - name: Deploy API via WebDeploy
+        shell: pwsh
+        run: |
+          $msdeploy = "C:\Program Files\IIS\Microsoft Web Deploy V3\msdeploy.exe"
+          & $msdeploy `
+            -verb:sync `
+            -source:contentPath="${{ github.workspace }}\publish\api" `
+            -dest:contentPath="${{ secrets.MSDEPLOY_SITE }}",computerName="https://${{ secrets.MSDEPLOY_SERVER }}:8172/msdeploy.axd?site=${{ secrets.MSDEPLOY_SITE }}",userName="${{ secrets.MSDEPLOY_USER }}",password="${{ secrets.MSDEPLOY_PASSWORD }}",authType="Basic" `
+            -allowUntrusted
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Deploy summary
+        shell: pwsh
+        run: |
+          Add-Content $env:GITHUB_STEP_SUMMARY "### Deploy Summary`n"
+          Add-Content $env:GITHUB_STEP_SUMMARY "| Campo | Valor |`n|---|---|"
+          Add-Content $env:GITHUB_STEP_SUMMARY "| Versión desplegada | ``${{ needs.build.outputs.nuget_version }}`` |"
+          Add-Content $env:GITHUB_STEP_SUMMARY "| Ambiente | ``${{ github.base_ref }}`` |"
+          Add-Content $env:GITHUB_STEP_SUMMARY "| URL | http://poctest.runasp.net/version |"
+          Add-Content $env:GITHUB_STEP_SUMMARY "| PR | #${{ github.event.pull_request.number }} |"

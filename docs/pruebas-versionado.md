@@ -227,6 +227,30 @@ Validación de la estrategia de versionado con NBGV alineada al **Estándar de G
 
 ---
 
+## Validación de deploy en servidor (`http://poctest.runasp.net/version`)
+
+Deploy automático habilitado vía WebDeploy en PRs hacia `dev`, `qa` y `uat`.
+
+### Resultado validado — PR #3 → `dev`
+
+```json
+{
+  "version": "1.0.28-pr3",
+  "environment": "Production",
+  "branch": "unknown",
+  "commit": "unknown",
+  "buildDate": "2026-06-30T15:29:05.6764025Z"
+}
+```
+
+| Campo | Observación |
+|---|---|
+| `version` | Correcta: `1.0.28-pr3` refleja el número de PR |
+| `branch` / `commit` | `"unknown"` esperado — hosting compartido sin acceso a git ni variables de GitHub |
+| Run CI | [28454735266](https://github.com/CarlosMoralesRyndem/VersioningPoC/actions/runs/28454735266) |
+
+---
+
 ## Hallazgos durante la ejecución
 
 | Hallazgo | Acción tomada |
@@ -234,3 +258,6 @@ Validación de la estrategia de versionado con NBGV alineada al **Estándar de G
 | `R*-main` no estaba en triggers de push del workflow | Agregado `R*-main` en `dotnet-ci.yml` |
 | Rama `develop` usada en lugar de `dev` | Corregido a `dev` para alinearse al estándar |
 | `release/*` en `publicReleaseRefSpec` sin respaldo en el estándar | Removido; reemplazado por `R\d+-main` |
+| Job `deploy` no aparecía en runs de PR | La rama del PR debe tener el workflow actualizado — se resuelve mergeando `main` antes de abrir el PR |
+| `ERROR_FILE_IN_USE` al deployar | Agregado `-enableRule:AppOffline` al comando msdeploy |
+| `-p:AssemblyInformationalVersion` no sobreescribe la versión NBGV | NBGV ignora ese override; solución: escribir `ci-version.txt` en el publish output y leerlo en runtime |

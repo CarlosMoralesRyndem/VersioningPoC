@@ -5,7 +5,7 @@ public class VersionLoggerService(ILogger<VersionLoggerService> logger, IHostEnv
     {
         logger.LogInformation(
             "Worker started | Version={Version} | Branch={Branch} | Commit={Commit} | Environment={Environment}",
-            ThisAssembly.AssemblyInformationalVersion, BuildInfo.Branch, BuildInfo.Commit, env.EnvironmentName);
+            BuildInfo.Version, BuildInfo.Branch, BuildInfo.Commit, env.EnvironmentName);
 
         return Task.CompletedTask;
     }

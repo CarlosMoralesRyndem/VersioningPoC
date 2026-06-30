@@ -1,9 +1,23 @@
 using System.Diagnostics;
+using System.Reflection;
 
 public static class BuildInfo
 {
+    public static readonly string Version = ResolveVersion();
     public static readonly string Branch = ResolveBranch();
     public static readonly string Commit = ResolveCommit();
+
+    private static string ResolveVersion()
+    {
+        var ciFile = Path.Combine(AppContext.BaseDirectory, "ci-version.txt");
+        if (File.Exists(ciFile))
+            return File.ReadAllText(ciFile).Trim();
+
+        return Assembly.GetExecutingAssembly()
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion
+            ?? ThisAssembly.AssemblyInformationalVersion;
+    }
 
     private static string ResolveBranch()
     {
@@ -34,7 +48,7 @@ public static class BuildInfo
 
     private static string ResolveCommit()
     {
-        var version = ThisAssembly.AssemblyInformationalVersion;
+        var version = Version;
 
         var dashG = version.IndexOf("-g", StringComparison.Ordinal);
         if (dashG > 0) return version[(dashG + 2)..];

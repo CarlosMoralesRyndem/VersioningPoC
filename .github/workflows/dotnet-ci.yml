@@ -94,6 +94,12 @@ jobs:
         if: steps.version.outputs.is_env_pr == 'true'
         run: echo "${{ steps.version.outputs.nuget_version }}" > publish/api/ci-version.txt
 
+      - name: Write CI branch file
+        run: |
+          BRANCH="${{ github.head_ref || github.ref_name }}"
+          echo "$BRANCH" > publish/api/ci-branch.txt
+          echo "$BRANCH" > publish/worker/ci-branch.txt
+
       - name: Upload API artifact
         uses: actions/upload-artifact@v4
         with:
